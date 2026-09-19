@@ -152,6 +152,13 @@ async function setProgress(progress) {
   await navigate(appUrl);
 }
 
+async function enterGame(progress) {
+  await setProgress(progress);
+  const entered = await clickText('つづきから');
+  if (!entered) throw new Error('Could not find continue button');
+  await sleep(500);
+}
+
 async function collectMetrics(label) {
   const metrics = await evaluate(`(() => {
     const vw = window.innerWidth, vh = window.innerHeight;
@@ -226,7 +233,7 @@ await screenshot('01-mobile-title.png');
 metrics.push(await collectMetrics('mobile-title'));
 
 // Mobile home with current gameplay systems visible
-await setProgress(mid);
+await enterGame(mid);
 await screenshot('02-mobile-home.png');
 metrics.push(await collectMetrics('mobile-home'));
 
@@ -243,15 +250,14 @@ await screenshot('04-mobile-explore-menu.png');
 metrics.push(await collectMetrics('mobile-explore-menu'));
 
 // Back to home, then gallery
-await clickText('エリア選択を閉じる').catch(() => false);
-await navigate(appUrl);
+await enterGame(mid);
 await clickText('図鑑');
 await sleep(400);
 await screenshot('05-mobile-gallery.png');
 metrics.push(await collectMetrics('mobile-gallery'));
 
 // Settings
-await navigate(appUrl);
+await enterGame(mid);
 await evaluate(`(() => { const b = document.querySelector('button[aria-label="設定を開く"]'); if (b) b.click(); })()`);
 await sleep(300);
 await screenshot('06-mobile-settings.png');
@@ -259,7 +265,7 @@ metrics.push(await collectMetrics('mobile-settings'));
 
 // Desktop home
 await setViewport(1440, 900, false);
-await navigate(appUrl);
+await enterGame(mid);
 await screenshot('07-desktop-home.png');
 metrics.push(await collectMetrics('desktop-home'));
 
