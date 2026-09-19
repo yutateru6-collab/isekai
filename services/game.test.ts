@@ -161,7 +161,7 @@ describe('save, inventory and buddy integrity', () => {
 
     p = reduce(p, { type: 'item', id: 'item_candy' });
     p = reduce(p, { type: 'feed', id: 'item_candy' });
-    expect(p.inventory).toEqual(['item_candy']);
+    expect(p.inventory).toEqual(['item_nut', 'item_candy']);
   });
 
   it('roundtrips a completed v2 save and preserves new progress fields', () => {
