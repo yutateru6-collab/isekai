@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CheckCircle2, ClipboardList, Lightbulb, Mail } from 'lucide-react';
 import { ITEMS } from '../constants';
 import { InvestigationMission } from '../data/missions';
@@ -13,6 +13,7 @@ interface Props {
 
 export default function MissionCard({ mission, completedCount, total, postscript, onAcknowledgePostscript }: Props) {
   const [showHint, setShowHint] = useState(false);
+  useEffect(() => setShowHint(false), [mission?.id]);
 
   if (postscript) return <section className="rounded-2xl bg-indigo-950 text-white p-4 mb-4 shadow-lg border border-indigo-300/40">
     <div className="flex items-center gap-2 text-indigo-200 text-xs font-black tracking-wider"><Mail size={17} />叔父さんからの追伸</div>
