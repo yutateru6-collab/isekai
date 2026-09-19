@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Creature, ChatMessage } from '../types';
 import { X, Play, Image as ImageIcon, Sparkles, Heart, Star, MessageCircle, Send, Bot, FileText, Activity } from 'lucide-react';
-import { decipherCreatureLore, chatWithDoctor } from '../services/geminiService';
+import { decipherCreatureLore, chatWithDoctor } from '../services/localCreatureService';
 
 interface CreatureDetailModalProps {
   creature: Creature | null;
