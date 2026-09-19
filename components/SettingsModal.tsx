@@ -35,7 +35,9 @@ export default function SettingsModal({ progress, onRestore, onClose }: { progre
       </div>}
       <div className="border-t border-amber-200 mt-6 pt-4 text-sm leading-6">
         <h3 className="font-black mb-2">遊び方</h3>
-        <p>① 場所と観測時間を選ぶ<br />② ルートをたどって生物を探す<br />③ 光が線に重なったらタップして撮影<br />④ 図鑑から相棒とお気に入りを選ぶ</p>
+        <p>① 叔父さんの調査依頼の手がかりを読む<br />② 場所と観測時間を選ぶ<br />③ ルートをたどって生物を探す<br />④ 光が線に重なったらタップして撮影<br />⑤ 図鑑から相棒とお気に入りを選ぶ</p>
+        <p className="mt-3">行き詰まった依頼は追加ヒントを見られます。同じ生物の再観測で、新しい生態が見つかることもあります。</p>
+        <p className="mt-3">相棒との探索・撮影・おやつは思い出として残ります。絆が増える通常のふれあいは1日3回までです。</p>
         <p className="mt-3">5種類で未確認エリアが開きます。全種類を記録して、叔父さんの帰り道を完成させよう。</p>
         <p className="mt-3 text-gray-500">アプリ内だけで探索できます。位置情報・カメラ・アカウント登録は不要です。</p>
       </div>

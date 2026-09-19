@@ -25,13 +25,15 @@ interface AmidakujiViewProps {
     time: TimeOfDay;
     discoveredIds: string[];
     rareBonus: boolean;
+    missionTargetId?: string;
+    missionBoost?: boolean;
     onComplete: (reward: Reward) => void;
     onClose: () => void;
 }
 
 const LINES = 4;
 
-const AmidakujiView: React.FC<AmidakujiViewProps> = ({ areaId, time, discoveredIds, rareBonus, onComplete, onClose }) => {
+const AmidakujiView: React.FC<AmidakujiViewProps> = ({ areaId, time, discoveredIds, rareBonus, missionTargetId, missionBoost = false, onComplete, onClose }) => {
     const [bridges, setBridges] = useState<Bridge[]>([]);
     const [rewards, setRewards] = useState<Reward[]>([]);
     const [selectedLine, setSelectedLine] = useState<number>(1); // Default to lane 1 (0-indexed)
@@ -62,14 +64,15 @@ const AmidakujiView: React.FC<AmidakujiViewProps> = ({ areaId, time, discoveredI
 
         // 2. Generate Rewards
         const pool = eligibleCreatures(areaId, time, discoveredIds);
-        const first = pickCreature(pool, discoveredIds, rareBonus);
+        const missionTarget = missionBoost && missionTargetId ? pool.find(c => c.id === missionTargetId) : undefined;
+        const first = missionTarget ?? pickCreature(pool, discoveredIds, rareBonus);
         const second = pickCreature(pool.filter(c => c.id !== first?.id), discoveredIds, rareBonus) ?? first;
         const item = ITEMS[Math.floor(Math.random() * ITEMS.length)];
         const newRewards: Reward[] = [
-            first ? { type: 'creature', data: first, label: '生体反応' } : { type: 'item', data: item, label: 'アイテム' },
+            first ? { type: 'creature', data: first, label: missionTarget && first.id === missionTarget.id ? '強い生体反応' : '生体反応' } : { type: 'item', data: item, label: 'アイテム' },
             second ? { type: 'creature', data: second, label: '生体反応' } : { type: 'item', data: item, label: 'アイテム' },
             { type: 'item', data: item, label: 'アイテム' },
-            first ? { type: 'creature', data: pickCreature(pool, discoveredIds, rareBonus), label: '生体反応' } : { type: 'item', data: item, label: 'アイテム' }
+            missionTarget ? { type: 'creature', data: missionTarget, label: '強い生体反応' } : first ? { type: 'creature', data: pickCreature(pool, discoveredIds, rareBonus), label: '生体反応' } : { type: 'item', data: item, label: 'アイテム' }
         ];
 
         // Shuffle
@@ -79,7 +82,7 @@ const AmidakujiView: React.FC<AmidakujiViewProps> = ({ areaId, time, discoveredI
         }
         setRewards(newRewards.slice(0, LINES));
 
-    }, [areaId, time]);
+    }, [areaId, time, discoveredIds, rareBonus, missionTargetId, missionBoost]);
 
     const calculatePath = (startCol: number) => {
         const path: AmidaPoint[] = [];
@@ -234,7 +237,8 @@ const AmidakujiView: React.FC<AmidakujiViewProps> = ({ areaId, time, discoveredI
 
             {/* Header */}
             <div className={`z-10 bg-white/90 px-8 py-3 rounded-full shadow-lg border-4 ${config.borderColor} mb-3 mt-2 shrink-0`}>
-                <h2 className={`text-xl font-black ${config.themeColor} tracking-widest`}>散策ルートを選ぼう！</h2>
+                <h2 className={`text-xl font-black ${config.themeColor} tracking-widest`}>{missionBoost ? '調査依頼の反応あり！' : '散策ルートを選ぼう！'}</h2>
+                {missionBoost && <p className="text-xs font-bold text-gray-500 text-center mt-1">手がかりと条件が一致。対象の反応が強くなっています。</p>}
             </div>
 
             {/* Game Board */}
