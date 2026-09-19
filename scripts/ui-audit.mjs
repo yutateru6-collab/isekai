@@ -219,6 +219,7 @@ const metrics = [];
 
 // Mobile title
 await setViewport(390, 844, true);
+await navigate(appUrl);
 await evaluate("localStorage.clear()");
 await navigate(appUrl);
 await screenshot('01-mobile-title.png');
