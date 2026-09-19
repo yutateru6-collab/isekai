@@ -29,7 +29,7 @@ export function loadProgress(storage: SaveStorage) {
     try {
       return {
         progress: parseProgress(legacy),
-        error: '以前の保存データを新しい形式へ移行しました。進捗はそのまま引き継がれます。',
+        error: '',
         writable: true
       };
     } catch {
