@@ -4,9 +4,10 @@ import { CREATURES } from '../constants';
 
 interface TitleScreenProps {
     onStart: () => void;
+    hasSave?: boolean;
 }
 
-const TitleScreen: React.FC<TitleScreenProps> = ({ onStart }) => {
+const TitleScreen: React.FC<TitleScreenProps> = ({ onStart, hasSave }) => {
     const [featuredCreature, setFeaturedCreature] = useState(CREATURES[0]);
     const [isHovered, setIsHovered] = useState(false);
 
@@ -26,7 +27,7 @@ const TitleScreen: React.FC<TitleScreenProps> = ({ onStart }) => {
             >
                 <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60"></div>
                 {/* Animated Particles/Dust */}
-                <div className="absolute inset-0 opacity-30" style={{ backgroundImage: "url('https://www.transparenttextures.com/patterns/stardust.png')" }}></div>
+                <div className="absolute inset-0 opacity-30" style={{ backgroundImage: "radial-gradient(white 1px, transparent 1px)" }}></div>
             </div>
 
 
@@ -76,7 +77,7 @@ const TitleScreen: React.FC<TitleScreenProps> = ({ onStart }) => {
 
                         <div className="flex items-center gap-3 relative z-10 drop-shadow-md">
                             <Play className="w-8 h-8 fill-current" />
-                            <span>スタート</span>
+                            <span>{hasSave ? 'つづきから' : 'スタート'}</span>
                         </div>
                     </button>
                     <div className="text-center mt-4 font-bold text-white/90 text-sm animate-pulse">

@@ -41,6 +41,7 @@ const GalleryView: React.FC<GalleryViewProps> = ({
                     </div>
                     <input
                         type="text"
+                        aria-label="生物名で検索"
                         placeholder="生物名で検索..."
                         className="w-full pl-12 pr-4 py-4 bg-white border-4 border-pastel-blue rounded-full text-kids-text placeholder-gray-400 focus:outline-none focus:border-pop-blue transition-all shadow-sm font-bold text-lg"
                         value={searchQuery}
@@ -78,6 +79,7 @@ const GalleryView: React.FC<GalleryViewProps> = ({
                 ))}
             </div>
 
+            {filteredCreatures.length === 0 && <p className="bg-white rounded-xl p-6 text-center font-bold">一致する生物がいません。名前やエリアを変えてみよう。</p>}
             {/* Grid */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-x-2 md:gap-x-4 gap-y-4 md:gap-y-6 pb-4 px-1 md:px-2">
                 {filteredCreatures.map((creature, index) => (

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { UncleMessage } from '../data/uncleMessages';
 import { Smartphone, ChevronLeft, Send, X } from 'lucide-react';
+import { useDialog } from './useDialog';
 
 interface UncleMessageModalProps {
     message: UncleMessage | null;
@@ -10,6 +11,7 @@ interface UncleMessageModalProps {
 
 const UncleMessageModal: React.FC<UncleMessageModalProps> = ({ message, onClose, userName }) => {
     const [isImageExpanded, setIsImageExpanded] = useState(false);
+    const dialog = useDialog(!!message);
 
     if (!message) return null;
 
@@ -17,7 +19,7 @@ const UncleMessageModal: React.FC<UncleMessageModalProps> = ({ message, onClose,
     const formattedBody = message.body.replace(/【ユーザー名】/g, userName);
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 font-sans">
+        <div ref={dialog} role="dialog" aria-modal="true" aria-label="叔父さんからの通信" className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 font-sans">
             <div className="relative w-full max-w-sm bg-gray-900 rounded-[3rem] border-8 border-gray-800 shadow-2xl overflow-hidden animate-in zoom-in-50 duration-300">
 
                 {/* Smartphone Bezel/Status Bar */}
@@ -25,16 +27,16 @@ const UncleMessageModal: React.FC<UncleMessageModalProps> = ({ message, onClose,
                     <div className="w-16 h-4 bg-black rounded-b-xl"></div>
                 </div>
 
-                <div className="h-[600px] bg-slate-50 flex flex-col relative overflow-hidden">
+                <div className="h-[min(600px,78dvh)] bg-slate-50 flex flex-col relative overflow-hidden">
 
                     {/* Header */}
                     <div className="bg-white p-4 shadow-sm border-b flex items-center gap-3 z-10 sticky top-0">
-                        <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full">
+                        <button aria-label="通信を閉じる" onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full">
                             <ChevronLeft className="w-6 h-6 text-blue-500" />
                         </button>
                         <div className="flex-1">
                             <h3 className="font-bold text-lg text-gray-900 leading-tight">叔父さん</h3>
-                            <p className="text-xs text-gray-500">Online</p>
+                            <p className="text-xs text-gray-500">観測通信</p>
                         </div>
                         <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-xl border-2 border-indigo-200">
                             👨‍🔬
@@ -85,9 +87,9 @@ const UncleMessageModal: React.FC<UncleMessageModalProps> = ({ message, onClose,
                             +
                         </div>
                         <div className="flex-1 bg-gray-100 rounded-full px-4 py-2 text-sm text-gray-400">
-                            メッセージを入力...
+                            受信した通信を保存しました
                         </div>
-                        <button onClick={onClose} className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center shadow-md active:scale-95 transition-transform text-white">
+                        <button aria-label="通信を閉じる" onClick={onClose} className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center shadow-md active:scale-95 transition-transform text-white">
                             <Send className="w-4 h-4 ml-0.5" />
                         </button>
                     </div>

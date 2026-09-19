@@ -1,387 +1,93 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Creature, CreatureType, SearchArea, SubAreaSpot, Item, SearchPhase, MapNode, TimeOfDay } from '../types';
-import { SEARCH_AREAS, AREA_SPOTS, CREATURES, ITEMS } from '../constants';
-import { Radar, X, Heart, Box, ScanLine, Star, Sparkles, MapPin, Camera, Footprints } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Creature, SearchArea, Item, TimeOfDay, NewsData } from '../types';
+import { SEARCH_AREAS } from '../constants';
+import { Radar, X, Box, MapPin, ArrowLeft, Lock } from 'lucide-react';
+import { eligibleCreatures, MYSTERY_UNLOCK } from '../services/game';
 import BuddyView from './BuddyView';
-import AmidakujiView from './AmidakujiView';
+import AmidakujiView, { Reward } from './AmidakujiView';
 import RhythmCapture from './RhythmCapture';
-import AmbientOverlay from './AmbientOverlay';
 
-interface NewsMessage {
-    title: string;
-    content: string;
+interface Props {
+  showNews: boolean; setShowNews: (show: boolean) => void; newsMessage: NewsData;
+  buddy: Creature | null; inventory: Item[]; setShowInventory: (show: boolean) => void;
+  timeConfig: { label: string; icon: React.ElementType }; currentTime: TimeOfDay; onTimeChange: (time: TimeOfDay) => void;
+  handleBuddyInteraction: (e: React.MouseEvent) => void; discoveredIds: string[];
+  onCapture: (id: string) => void; onFindItem: (id: string) => void; onCreatureClick: (c: Creature) => void;
+  activeArea: SearchArea | null; onAreaSelect: (area: SearchArea | null) => void;
 }
-
-interface ExplorationViewProps {
-    showNews: boolean;
-    setShowNews: (show: boolean) => void;
-    newsMessage: NewsMessage | null;
-    buddy: Creature | null;
-    inventory: Item[];
-    setShowInventory: (show: boolean) => void;
-    timeConfig: { label: string; icon: any };
-    handleBuddyInteraction: (e: React.MouseEvent) => void;
-    setShowBook: (show: boolean) => void;
-    discoveredIds: string[];
-    setDiscoveredIds: React.Dispatch<React.SetStateAction<string[]>>;
-    setInventory: React.Dispatch<React.SetStateAction<Item[]>>;
-    onCreatureClick: (creature: Creature) => void;
-    userName: string;
-    // Lifted State Props
-    activeArea: SearchArea | null;
-    onAreaSelect: (area: SearchArea | null) => void;
-}
-
-type ExplorationPhase = 'amida' | 'scanning' | 'aiming' | 'result' | 'idle' | 'rhythm';
-
-const ExplorationView: React.FC<ExplorationViewProps> = ({
-    showNews,
-    setShowNews,
-    newsMessage,
-    buddy,
-    inventory,
-    setShowInventory,
-    timeConfig,
-    handleBuddyInteraction,
-    setShowBook,
-    discoveredIds,
-    setDiscoveredIds,
-    setInventory,
-    onCreatureClick,
-    activeArea,
-    onAreaSelect
-}) => {
-    const [phase, setPhase] = useState<ExplorationPhase>('idle');
-    const [foundCreature, setFoundCreature] = useState<Creature | null>(null);
-    const [foundItem, setFoundItem] = useState<Item | null>(null);
-
-    // Ambient Mode State
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-    // Initial Start
-    const startExploration = (area: SearchArea) => {
-        onAreaSelect(area);
-        setPhase('amida');
-        setFoundCreature(null);
-        setFoundItem(null);
-    };
-
-    const quitExploration = () => {
-        setPhase('idle');
-        onAreaSelect(null);
-        setFoundCreature(null);
-        setFoundItem(null);
-    };
-
-    const handleAmidaComplete = (reward: { type: 'creature' | 'item' | 'empty'; data?: any }) => {
-        if (reward.type === 'empty') {
-            alert("何もいなかった……。\n（お散歩終了）");
-            quitExploration();
-            return;
-        }
-
-        // Delay for dramatic effect
-        setTimeout(() => {
-            if (reward.type === 'creature') {
-                const c = reward.data as Creature;
-                setFoundCreature(c);
-                setPhase('scanning');
-                // Trigger rhythm game
-                setTimeout(() => {
-                    setPhase('rhythm');
-                }, 1500);
-            } else if (reward.type === 'item') {
-                const i = reward.data as Item;
-                setFoundItem(i);
-                setInventory(prev => [...prev, i]);
-                setPhase('result');
-            }
-        }, 500);
-    };
-
-    const handleShutterClick = () => {
-        // Success capture
-        if (foundCreature) {
-            if (!discoveredIds.includes(foundCreature.id)) {
-                setDiscoveredIds(prev => [...prev, foundCreature.id]);
-            }
-        }
-        setPhase('result');
-    };
-
-    const closeSearch = () => {
-        setPhase('idle');
-        onAreaSelect(null); // Return to home
-        setFoundCreature(null);
-        setFoundItem(null);
-        setIsMenuOpen(false); // Return to ambient mode
-    };
-
-    if (activeArea) {
-        return (
-            <div className="fixed inset-0 z-40 bg-black font-dot select-none touch-none overflow-hidden">
-
-                {/* AMIDA VIEW */}
-                {phase === 'amida' && (
-                    <AmidakujiView
-                        areaId={activeArea.id}
-                        onComplete={handleAmidaComplete}
-                        onClose={quitExploration}
-                    />
-                )}
-
-                {/* RHYTHM CAPTURE VIEW */}
-                {phase === 'rhythm' && foundCreature && (
-                    <RhythmCapture
-                        creature={foundCreature}
-                        onCapture={() => {
-                            // Success capture
-                            if (!discoveredIds.includes(foundCreature.id)) {
-                                setDiscoveredIds(prev => [...prev, foundCreature.id]);
-                            }
-                            setPhase('result');
-                        }}
-                        onEscape={() => {
-                            alert("逃げられてしまった……！");
-                            quitExploration();
-                        }}
-                    />
-                )}
-
-                {/* EXISTING SCAN/RESULT VIEWS */}
-                {(phase === 'scanning' || phase === 'aiming' || phase === 'result') && (
-                    <div className="absolute inset-0 z-50 flex flex-col items-center justify-center font-maru overflow-hidden">
-                        {(phase === 'aiming' || phase === 'result') && (
-                            <div className="absolute inset-0 z-0">
-                                <div className="absolute inset-0 bg-black"></div>
-                                <img src={activeArea.fpsImage} alt="Background" className="w-full h-full object-cover scale-110" />
-                                <div className="absolute inset-0 bg-black/10"></div>
-                            </div>
-                        )}
-
-                        <div className={`absolute inset-0 transition-colors duration-500 z-0 ${(phase === 'aiming' || phase === 'result') ? 'bg-black/20' : 'bg-black'}`}></div>
-
-                        {phase === 'scanning' && (
-                            <div className="relative z-10 flex flex-col items-center text-center w-full">
-                                <div className="relative w-72 h-72 flex items-center justify-center mb-8">
-                                    <div className="absolute inset-0 border-4 border-pop-green/30 rounded-full animate-ping delay-75"></div>
-                                    <div className="absolute inset-0 border-4 border-pop-green/50 rounded-full animate-ping delay-500"></div>
-                                    <div className="absolute inset-8 border-4 border-dashed border-pop-green/40 rounded-full animate-spin-slow"></div>
-                                    <div className="relative bg-black rounded-full p-1 border-4 border-pop-green shadow-[0_0_30px_rgba(6,214,160,0.5)]">
-                                        <div className="w-48 h-48 bg-gray-900 rounded-full flex items-center justify-center overflow-hidden relative">
-                                            <div className="absolute w-full h-1/2 bg-gradient-to-b from-transparent to-pop-green/50 top-0 left-0 origin-bottom animate-spin"></div>
-                                            <Radar className="w-24 h-24 text-pop-green relative z-10" />
-                                        </div>
-                                    </div>
-                                </div>
-                                <h2 className="text-3xl font-black text-white mb-2 animate-pulse tracking-widest">接近中！</h2>
-                                <p className="text-pop-green font-bold text-lg animate-bounce">ターゲット捕捉……</p>
-                            </div>
-                        )}
-
-                        {/* OLD AIMING PHASE (Kept just in case, but code enters 'rhythm' now) */}
-                        {phase === 'aiming' && (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
-                                {/* Fallback if needed, but currently unused as we switch to rhythm */}
-                            </div>
-                        )}
-
-                        {phase === 'result' && (
-                            <div className="relative z-50 max-w-sm w-full animate-in zoom-in-50 duration-500 p-4">
-                                {foundCreature && (
-                                    <>
-                                        <div className="absolute -top-20 -left-20 text-pop-yellow animate-bounce delay-100"><Star className="w-10 h-10 fill-current" /></div>
-                                        <div className="absolute -top-10 -right-10 text-pop-pink animate-bounce delay-200"><Heart className="w-8 h-8 fill-current" /></div>
-                                        <div className="bg-white p-2 rounded-3xl shadow-2xl rotate-1 border-4 border-white">
-                                            <div className="bg-stripes p-6 rounded-[20px] flex flex-col items-center text-center border-2 border-gray-100">
-                                                <div className="mb-4 relative">
-                                                    <span className="absolute -top-6 left-1/2 -translate-x-1/2 bg-pop-pink text-white px-6 py-2 rounded-full font-black text-xl shadow-pop border-2 border-white whitespace-nowrap z-20 animate-bounce">生物発見！</span>
-                                                    <div className="w-48 h-48 bg-white rounded-2xl border-4 border-pop-yellow shadow-sm overflow-hidden relative rotate-[-2deg]">
-                                                        <img src={foundCreature.imageUrl} className="w-full h-full object-cover" alt={foundCreature.name} />
-                                                    </div>
-                                                </div>
-                                                <div className="mb-6 w-full">
-                                                    <h3 className="text-2xl font-black text-kids-text mb-2">{foundCreature.name}</h3>
-                                                    <div className="flex justify-center gap-1 mb-2">
-                                                        {[...Array(foundCreature.dangerLevel)].map((_, i) => (
-                                                            <Star key={i} className="w-5 h-5 fill-pop-yellow text-pop-yellow" />
-                                                        ))}
-                                                    </div>
-                                                    <p className="text-sm font-bold text-gray-400 bg-gray-100 rounded-full inline-block px-3 py-1">レア度</p>
-                                                </div>
-                                                <div className="flex gap-3 w-full">
-                                                    <button onClick={() => { closeSearch(); onCreatureClick(foundCreature); }} className="flex-1 bg-pop-blue text-white py-3 rounded-xl font-black shadow-pop hover:translate-y-1 transition-all border-2 border-pop-blue">詳細を確認</button>
-                                                    <button onClick={closeSearch} className="flex-1 bg-white text-gray-500 border-2 border-gray-200 py-3 rounded-xl font-black hover:bg-gray-50">閉じる</button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
-                                {foundItem && (
-                                    <>
-                                        <div className="absolute -top-10 left-1/2 -translate-x-1/2 text-gray-400 font-bold animate-pulse text-xl whitespace-nowrap">Escaped...</div>
-                                        <div className="bg-white/90 p-2 rounded-3xl shadow-2xl -rotate-1 border-4 border-gray-300 mt-8">
-                                            <div className="bg-gray-50 p-6 rounded-[20px] flex flex-col items-center text-center border-2 border-gray-200">
-                                                <div className="mb-4 relative">
-                                                    <span className="absolute -top-6 left-1/2 -translate-x-1/2 bg-gray-500 text-white px-4 py-1 rounded-full font-black text-sm shadow-sm border-2 border-white whitespace-nowrap z-20">何か落ちている...</span>
-                                                    <div className="w-32 h-32 bg-white rounded-full border-4 border-gray-300 flex items-center justify-center text-6xl shadow-inner">
-                                                        {foundItem.icon}
-                                                    </div>
-                                                </div>
-                                                <div className="mb-4">
-                                                    <h3 className="text-xl font-black text-gray-700 mb-1">{foundItem.name}</h3>
-                                                    <p className="text-xs font-bold text-gray-500">{foundItem.description}</p>
-                                                </div>
-                                                <button onClick={closeSearch} className="w-full bg-gray-200 text-gray-600 py-3 rounded-xl font-black hover:bg-gray-300 transition-colors">ポケットに入れる</button>
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-        );
+export default function ExplorationView(p: Props) {
+  const [menu, setMenu] = useState(false);
+  const [phase, setPhase] = useState<'route' | 'scanning' | 'capture' | 'result' | 'escaped'>('route');
+  const [reward, setReward] = useState<Reward | null>(null);
+  const [duplicate, setDuplicate] = useState(false);
+  const [trip, setTrip] = useState(0);
+  const completionHandled = useRef(false);
+  const creature = reward?.type === 'creature' ? reward.data as Creature : null;
+  const item = reward?.type === 'item' ? reward.data as Item : null;
+  useEffect(() => {
+    if (phase !== 'scanning') return;
+    const timer = setTimeout(() => setPhase('capture'), 1200);
+    return () => clearTimeout(timer);
+  }, [phase]);
+  function start(area: SearchArea) {
+    if (area.id === 'mystery' && p.discoveredIds.length < MYSTERY_UNLOCK) return;
+    p.onAreaSelect(area); setPhase('route'); setReward(null); setTrip(n => n + 1); completionHandled.current = false;
+  }
+  function finishRoute(found: Reward) {
+    if (completionHandled.current) return;
+    completionHandled.current = true;
+    setReward(found);
+    if (found.type === 'creature' && found.data) {
+      setDuplicate(p.discoveredIds.includes(found.data.id));
+      setPhase('scanning');
+    } else {
+      if (found.type === 'item' && found.data) p.onFindItem(found.data.id);
+      setPhase('result');
     }
+  }
+  function quit() { p.onAreaSelect(null); setReward(null); setPhase('route'); }
 
-    return (
-        <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-            {showNews && newsMessage && (
-                <div className="mb-6 bg-slate-800 rounded-xl p-1 border-l-4 border-pop-green shadow-lg">
-                    <div className="bg-slate-900/50 p-3 rounded-lg flex items-start gap-3">
-                        <div className="mt-1 animate-pulse">
-                            <Radar className="w-5 h-5 text-pop-green" />
-                        </div>
-                        <div>
-                            <h4 className="text-xs font-mono text-pop-green mb-1 flex items-center gap-2">
-                                {newsMessage.title} <span className="text-[10px] opacity-50">{new Date().toLocaleDateString()}</span>
-                            </h4>
-                            <p className="text-sm font-bold text-white leading-relaxed font-dot">
-                                {newsMessage.content}
-                            </p>
-                        </div>
-                        <button onClick={() => setShowNews(false)} className="text-slate-500 hover:text-white">
-                            <X className="w-4 h-4" />
-                        </button>
-                    </div>
-                </div>
-            )}
+  if (p.activeArea) return <div className="fixed inset-0 z-40 bg-slate-950 overflow-y-auto font-maru">
+    {phase === 'route' && <AmidakujiView key={trip} areaId={p.activeArea.id} time={p.currentTime} discoveredIds={p.discoveredIds}
+      rareBonus={p.newsMessage.bonusAreaId === p.activeArea.id || p.inventory.some(i => i.id === p.newsMessage.luckyItemId)} onComplete={finishRoute} onClose={quit} />}
+    {phase === 'scanning' && <div className="min-h-[100dvh] flex flex-col items-center justify-center text-center text-white gap-6"><Radar size={96} className="text-emerald-400 animate-pulse" /><h2 className="text-3xl font-black">生体反応を発見！</h2><p>パラレル・カムを準備しています</p><button className="underline p-3" onClick={quit}>ホームへ戻る</button></div>}
+    {phase === 'capture' && creature && <RhythmCapture creature={creature} onCapture={() => { p.onCapture(creature.id); setPhase('result'); }} onEscape={() => setPhase('escaped')} />}
+    {(phase === 'result' || phase === 'escaped') && <div className="min-h-[100dvh] p-5 flex items-center justify-center" style={{ background: `linear-gradient(#0007,#000a),url('${p.activeArea.fpsImage}') center / cover` }}>
+      <div className="bg-[#fffaf2] w-full max-w-sm rounded-3xl p-6 text-center border-4 border-white shadow-2xl">
+        <h2 className="font-black text-2xl text-[#5d4037] mb-4">{phase === 'escaped' ? 'もう一度、落ち着いて' : creature ? duplicate ? '再観測成功！' : '新しい生物を発見！' : item ? 'アイテム発見！' : '今は静かなようだ'}</h2>
+        {creature && <><img src={creature.imageUrl} alt={creature.name} className="w-full aspect-square max-h-[35dvh] object-contain rounded-xl bg-white" /><h3 className="font-black text-xl mt-3">{creature.name}</h3></>}
+        {item && <><div className="text-6xl my-5">{item.icon}</div><h3 className="font-black text-xl">{item.name}</h3><p className="text-sm mt-2">{item.description}</p></>}
+        <p className="text-sm text-stone-600 my-4">{phase === 'escaped' ? '光が白い線に重なる瞬間にタップ。時間制限のない「ゆっくり撮影」も選べます。' : creature ? duplicate ? '観測のお礼にパラレルナッツをもらった！' : '図鑑に記録して、迷子を元の世界へ送り届けました。' : item ? 'バッグに入れました。相棒に渡してみよう。' : '別のルートや時間を試してみよう。'}</p>
+        {phase === 'escaped' && <button onClick={() => setPhase('capture')} className="w-full bg-emerald-700 text-white rounded-xl p-3 font-bold mb-2">撮影をやり直す</button>}
+        {phase === 'result' && creature && <button onClick={() => { quit(); p.onCreatureClick(creature); }} className="w-full bg-sky-700 text-white rounded-xl p-3 font-bold mb-2">図鑑で詳しく見る</button>}
+        <button onClick={() => start(p.activeArea!)} className="w-full bg-amber-100 text-[#5d4037] rounded-xl p-3 font-bold mb-2">このエリアをもう一度探索</button>
+        <button onClick={quit} className="w-full p-3 font-bold underline">ホームへ戻る</button>
+      </div>
+    </div>}
+  </div>;
 
-            <BuddyView
-                buddy={buddy}
-                onBuddyInteraction={handleBuddyInteraction}
-                onOpenInventory={(e) => { e.stopPropagation(); setShowInventory(true); }}
-            />
-
-            {!buddy && inventory.length > 0 && (
-                <button
-                    onClick={() => setShowInventory(true)}
-                    className="mb-6 w-full py-3 bg-white border-2 border-dashed border-gray-300 text-gray-500 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-50"
-                >
-                    <Box className="w-5 h-5" />
-                    所持アイテムを確認する ({inventory.length})
-                </button>
-            )}
-
-            {/* AMBIENT OVERLAY & MAP BUTTON */}
-            {!isMenuOpen && (
-                <>
-                    <AmbientOverlay discoveredIds={discoveredIds} />
-
-                    {/* Floating Map Button on the Desk */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 animate-in zoom-in duration-500">
-                        <button
-                            onClick={() => setIsMenuOpen(true)}
-                            className="group relative"
-                        >
-                            <div className="absolute inset-0 bg-white/50 blur-xl rounded-full scale-150 animate-pulse"></div>
-                            <div className="relative bg-white p-4 rounded-3xl shadow-pop border-4 border-white transform transition-transform group-hover:scale-105 group-hover:-rotate-3 group-active:scale-95">
-                                <MapPin className="w-12 h-12 text-pop-blue mb-1 mx-auto" />
-                                <span className="font-black text-pop-blue text-sm">調査に出発</span>
-                            </div>
-                            <div className="absolute -top-2 -right-2 bg-pop-red text-white text-xs font-bold px-2 py-1 rounded-full animate-bounce delay-100">
-                                Click!
-                            </div>
-                        </button>
-                    </div>
-                </>
-            )}
-
-            {/* AREA SELECTION MENU */}
-            {isMenuOpen && (
-                <div className="animate-in fade-in slide-in-from-bottom-8 duration-300 relative z-30">
-                    <button
-                        onClick={() => setIsMenuOpen(false)}
-                        className="absolute -top-12 right-0 bg-white/80 p-2 rounded-full shadow-sm hover:bg-white transition-colors"
-                    >
-                        <X className="w-6 h-6 text-gray-500" />
-                    </button>
-
-                    <div className="text-center mb-6 pt-10 pb-6 relative bg-white/50 rounded-3xl border-2 border-white shadow-inner">
-                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-pop-yellow text-white px-6 py-2 rounded-full font-black text-base shadow-sm border-2 border-white whitespace-nowrap z-10">
-                            現在の時刻：<timeConfig.icon className="inline w-5 h-5 mb-1 mx-1" />{timeConfig.label}
-                        </div>
-                        <h2 className="text-3xl md:text-4xl font-black text-kids-text mb-3 mt-4 tracking-wider">探索エリアを選択</h2>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-24">
-                        {SEARCH_AREAS.map((area) => (
-                            <button
-                                key={area.id}
-                                onClick={() => startExploration(area)}
-                                className={`relative overflow-hidden group p-4 rounded-3xl border-4 bg-white shadow-pop hover:shadow-pop-hover hover:translate-y-1 transition-all duration-200 text-left ${area.color.split(' ')[2]}`}
-                            >
-                                <div className="absolute inset-0 z-0 opacity-10 group-hover:opacity-20 transition-opacity duration-500">
-                                    <img src={area.bgImage} className="w-full h-full object-cover" alt="" />
-                                </div>
-                                <div className="relative z-10 flex items-center gap-4">
-                                    <div className={`w-16 h-16 rounded-2xl flex-shrink-0 flex items-center justify-center bg-white shadow-sm border-2 ${area.color.split(' ')[2]} ${area.color.split(' ')[1]}`}>
-                                        <area.icon className="w-8 h-8" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-lg font-black mb-1 text-kids-text">{area.label}</h3>
-                                        <p className="text-xs font-bold opacity-70 text-gray-600 line-clamp-2">{area.description}</p>
-                                    </div>
-                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 bg-white rounded-full p-2 opacity-0 group-hover:opacity-100 transition-all scale-0 group-hover:scale-100 shadow-sm text-pop-blue">
-                                        <ScanLine className="w-5 h-5" />
-                                    </div>
-                                </div>
-                            </button>
-                        ))}
-
-                        <button
-                            onClick={() => {
-                                // Mystery logic removed for brevity or kept same as original if needed
-                                // Keeping simple for now
-                                alert("このエリアはまだ解放されていません。\n（解放条件：生物を5種類発見）");
-                            }}
-                            className={`relative overflow-hidden group p-4 rounded-3xl border-4 shadow-pop transition-all duration-200 text-left col-span-1 sm:col-span-2 border-gray-500 bg-gray-800 text-gray-400 grayscale cursor-not-allowed`}
-                        >
-                            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-50 animate-pulse"></div>
-                            <div className="absolute inset-0 bg-black/60 z-20 flex items-center justify-center">
-                                <div className="bg-gray-900 border-2 border-gray-500 px-4 py-2 rounded-xl flex items-center gap-2">
-                                    <span className="text-2xl">🔒</span>
-                                    <span className="font-bold text-sm">LOCKED (要:発見5種)</span>
-                                </div>
-                            </div>
-                            <div className="relative z-10 flex items-center gap-4">
-                                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-sm border-2 border-white bg-gray-700 text-gray-500`}>
-                                    <Sparkles className={`w-8 h-8 text-gray-500`} />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-black mb-1">未確認エリア</h3>
-                                    <p className="text-xs font-bold opacity-80">強力な生体反応あり。警戒せよ。</p>
-                                </div>
-                            </div>
-                        </button>
-                    </div>
-                </div>
-            )}
-
-
-        </div>
-    );
-};
-
-export default ExplorationView;
+  return <div className="relative">
+    {p.showNews && <div className="mb-4 bg-slate-900 text-white p-4 rounded-2xl flex items-start gap-3"><Radar className="text-emerald-400 shrink-0" /><div className="flex-1"><h3 className="text-emerald-300 text-xs font-bold mb-1">{p.newsMessage.title}</h3><p className="text-sm leading-6">{p.newsMessage.content}</p></div><button aria-label="予報を閉じる" onClick={() => p.setShowNews(false)}><X size={18} /></button></div>}
+    <BuddyView buddy={p.buddy} onBuddyInteraction={p.handleBuddyInteraction} onOpenInventory={e => { e.stopPropagation(); p.setShowInventory(true); }} />
+    {!p.buddy && <button onClick={() => p.setShowInventory(true)} className="w-full mb-4 bg-white/95 p-3 rounded-xl font-bold flex justify-center gap-2"><Box size={20} />バッグ（{p.inventory.length}）</button>}
+    {!menu ? <div className="min-h-[32dvh] flex flex-col justify-center items-center py-8">
+      <button onClick={() => setMenu(true)} className="bg-[#fffaf2] rounded-3xl border-4 border-white px-10 py-6 shadow-pop hover:-translate-y-1 transition-transform text-[#5d4037] flex flex-col items-center gap-2"><MapPin size={44} /><span className="font-black text-2xl">調査に出発</span><span className="text-xs">いつもの場所に、未知の気配。</span></button>
+    </div> : <section className="bg-[#fffaf2]/95 rounded-3xl p-4 sm:p-6 border-2 border-white mb-6">
+      <div className="flex items-center gap-2 mb-4"><button aria-label="エリア選択を閉じる" className="p-2" onClick={() => setMenu(false)}><ArrowLeft /></button><h2 className="text-xl font-black">探索エリアを選択</h2></div>
+      <label htmlFor="observation-time" className="font-bold text-sm block mb-2">観測する時間</label>
+      <select id="observation-time" value={p.currentTime} onChange={e => p.onTimeChange(e.target.value as TimeOfDay)} className="w-full p-3 rounded-xl border-2 border-amber-300 bg-white font-bold">
+        {[TimeOfDay.Morning, TimeOfDay.Day, TimeOfDay.Sunset, TimeOfDay.Night].map(time => <option key={time}>{time}</option>)}
+      </select>
+      <p className="text-xs text-stone-600 mt-2 mb-4">パラレル・カムなら別の時間帯も観測できます。実際に外出する必要はありません。</p>
+      <div className="grid sm:grid-cols-2 gap-3">{SEARCH_AREAS.map(area => {
+        const locked = area.id === 'mystery' && p.discoveredIds.length < MYSTERY_UNLOCK;
+        const pool = eligibleCreatures(area.id, p.currentTime, p.discoveredIds);
+        const unseen = pool.filter(c => !p.discoveredIds.includes(c.id)).length;
+        return <button key={area.id} disabled={locked} onClick={() => start(area)} className={`text-left relative p-4 rounded-2xl border-2 bg-white overflow-hidden disabled:opacity-60 ${area.color.split(' ')[2]}`}>
+          <img src={area.bgImage} alt="" className="absolute inset-0 w-full h-full object-cover opacity-10" />
+          <div className="relative"><div className="flex items-center gap-2"><area.icon size={26} /><h3 className="font-black">{area.label}</h3></div><p className="text-xs leading-5 mt-2">{area.description}</p><p className="text-xs font-bold mt-3">{locked ? <span className="flex gap-1"><Lock size={14} />あと{MYSTERY_UNLOCK - p.discoveredIds.length}種類で解放</span> : pool.length ? `${p.currentTime}の生体反応 ${pool.length}種 ／ 未発見 ${unseen}種` : '今は生体反応なし・アイテムを探せます'}</p></div>
+        </button>;
+      })}</div>
+    </section>}
+  </div>;
+}

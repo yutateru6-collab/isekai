@@ -46,6 +46,9 @@ export const SEARCH_AREAS: SearchArea[] = [
     mapImage: '/bg/house_map_highres.png',
     fpsImage: '/bg/house_fps.png'
   },
+  { id: 'mystery', label: '未確認エリア', type: CreatureType.Mystery, icon: Sparkles,
+    color: 'bg-purple-100 text-purple-800 border-purple-400', description: '5種類の観測で見つかった世界の隙間。特別な生物の気配がする。',
+    bgImage: '/bg/garden.png', mapImage: '/bg/garden_map_highres.png', fpsImage: '/bg/garden_fps.png' },
 ];
 
 export const AREA_SPOTS: Record<string, SubAreaSpot[]> = {
@@ -773,28 +776,7 @@ export const CREATURES: Creature[] = [
     ],
     evolutionLevel: 1
   },
-  // --- PLACEHOLDERS TO REACH 50 ---
-  ...Array.from({ length: 17 }, (_, i) => {
-    const idNum = i + 33;
-    if (idNum === 44) return null;
-    return {
-      id: idNum < 10 ? `00${idNum}` : idNum < 100 ? `0${idNum}` : `${idNum}`,
-      name: '？？？',
-      latinName: 'Unobserved Specimen',
-      type: CreatureType.Mystery,
-      activeTime: [TimeOfDay.Any],
-      imageUrl: `/zukan/${idNum}.png`,
-      sketchUrl: `/zukan/${idNum}a.png`,
-      realImageUrl: `/zukan/${idNum}.png`,
-      shortDesc: '未観測の生体反応。詳細な調査が必要。',
-      dangerLevel: 1 as 1 | 2 | 3 | 4 | 5,
-      syncRate: 0,
-      role: 'none' as 'none',
-      perk: '???',
-      trivia: [],
-      evolutionLevel: 1
-    };
-  }).filter((c): c is Creature => c !== null)
+
 ];
 
 export const APP_NAME = "パラレル生物図鑑";

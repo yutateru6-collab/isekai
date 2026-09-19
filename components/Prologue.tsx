@@ -52,10 +52,10 @@ const Prologue: React.FC<PrologueProps> = ({ onComplete }) => {
     ];
 
     const handleRegister = () => {
-        if (!userName.trim()) return;
+        if (!userName.trim() || showStamp) return;
         setShowStamp(true);
         setTimeout(() => {
-            onComplete(userName);
+            onComplete(userName.trim());
         }, 1500);
     };
 
@@ -64,7 +64,7 @@ const Prologue: React.FC<PrologueProps> = ({ onComplete }) => {
 
             {/* Background: Antique Desk */}
             <div className={`fixed inset-0 transition-opacity duration-1000 ${fadeIn ? 'opacity-100' : 'opacity-0'}`}>
-                <img src="/image/desk_surface.png" alt="Desk" className="w-full h-full object-cover opacity-80" />
+                <img src="/image/home_bg_desk.png" alt="Desk" className="w-full h-full object-cover opacity-80" />
                 <div className="absolute inset-0 bg-gradient-radial from-transparent to-black/80"></div>
             </div>
 
@@ -79,7 +79,7 @@ const Prologue: React.FC<PrologueProps> = ({ onComplete }) => {
             `}
                     onClick={() => !isLetterExpanded && setIsLetterExpanded(true)}
                 >
-                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/aged-paper.png')] opacity-10 pointer-events-none"></div>
+                    <div className="absolute inset-0 bg-[url('/image/parchment.png')] opacity-10 pointer-events-none"></div>
 
                     {/* Letter Content */}
                     <div className="relative text-kids-text leading-relaxed space-y-4 flex-1">
@@ -143,6 +143,7 @@ const Prologue: React.FC<PrologueProps> = ({ onComplete }) => {
                                 <label className="block text-xs font-bold text-gray-400 mb-1 tracking-widest">AGENT NAME</label>
                                 <input
                                     type="text"
+                                    aria-label="調査員の名前"
                                     className="w-full text-center text-xl font-black border-b-2 border-gray-300 focus:border-pop-blue outline-none py-2 bg-transparent transition-colors placeholder:text-gray-200"
                                     placeholder="名前を記入"
                                     value={userName}
@@ -157,7 +158,7 @@ const Prologue: React.FC<PrologueProps> = ({ onComplete }) => {
 
                             <button
                                 onClick={handleRegister}
-                                disabled={!userName.trim()}
+                                disabled={!userName.trim() || showStamp}
                                 className={`
                             w-full py-3 rounded-lg font-black text-white shadow-md flex items-center justify-center gap-2 transition-all
                             ${userName.trim() ? 'bg-pop-blue hover:bg-pop-blue/90 hover:-translate-y-1' : 'bg-gray-300 cursor-not-allowed'}

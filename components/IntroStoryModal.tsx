@@ -43,9 +43,9 @@ const IntroStoryModal: React.FC<IntroStoryModalProps> = ({ onComplete }) => {
                         {stories[step]}
                     </p>
 
-                    <div className="absolute bottom-8 right-8 animate-bounce opacity-50">
-                        <ArrowRight className="w-6 h-6" />
-                    </div>
+                    <button onClick={e => { e.stopPropagation(); handleNext(); }} className="absolute bottom-8 right-8 flex gap-2 items-center rounded-full border border-white/50 px-5 py-3 font-bold">
+                        {step < 2 ? '次へ' : '手紙を開く'} <ArrowRight className="w-5 h-5" />
+                    </button>
                 </div>
             </div>
         </div>
