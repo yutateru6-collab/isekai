@@ -3,7 +3,9 @@ import { Book, Settings, Mail, Sunrise, Sun, Sunset, Moon, Trophy, X } from 'luc
 import { APP_NAME, CREATURES, ITEMS } from './constants';
 import { Creature, Item, SearchArea, TimeOfDay } from './types';
 import { UNCLE_MESSAGES, UncleMessage } from './data/uncleMessages';
+import { activeMission, MISSIONS, missionConditionsMet } from './data/missions';
 import { currentTimeOfDay, dailyNews, localDate, TOTAL_CREATURES } from './services/game';
+import { buddyReaction, memoryLabel } from './services/buddy';
 import { useProgress } from './services/useProgress';
 import CreatureDetailModal from './components/CreatureDetailModal';
 import BottomNav from './components/BottomNav';
@@ -17,6 +19,7 @@ import GalleryView from './components/GalleryView';
 import JournalView from './components/JournalView';
 import InventoryModal from './components/InventoryModal';
 import SettingsModal from './components/SettingsModal';
+import MissionCard from './components/MissionCard';
 
 const TIME_ICONS = { [TimeOfDay.Morning]: Sunrise, [TimeOfDay.Day]: Sun, [TimeOfDay.Sunset]: Sunset, [TimeOfDay.Night]: Moon, [TimeOfDay.Any]: Sun };
 
@@ -34,10 +37,15 @@ export default function App() {
   const [notice, setNotice] = useState('');
   const [date, setDate] = useState(localDate);
   const [time, setTime] = useState<TimeOfDay>(currentTimeOfDay);
+
   const news = dailyNews(date);
   const inventory = progress.inventory.map(id => ITEMS.find(i => i.id === id)!).filter(Boolean);
   const buddyData = CREATURES.find(c => c.id === progress.buddyId);
   const buddy: Creature | null = buddyData ? { ...buddyData, role: 'buddy', syncRate: progress.bonds[buddyData.id] ?? 0 } : null;
+  const buddyMemories = buddy ? (progress.buddyMemories[buddy.id] ?? []).map(memoryLabel) : [];
+  const petCountToday = progress.petDate === date ? progress.petCount : 0;
+  const mission = activeMission(progress.completedMissionIds);
+  const missionPostscript = MISSIONS.find(m => progress.completedMissionIds.includes(m.id) && !progress.seenMissionPostscriptIds.includes(m.id)) ?? null;
   const count = progress.discoveredIds.length;
   const rate = Math.round(count / TOTAL_CREATURES * 100);
   const unread = UNCLE_MESSAGES.filter(m => m.milestone <= count && !progress.readMilestones.includes(m.milestone));
@@ -74,11 +82,34 @@ export default function App() {
     if (message) dispatch({ type: 'read', milestone: message.milestone });
     setMessage(null);
   }
+
   function feed(item: Item) {
     if (!buddy) { setNotice('図鑑の発見済み生物を開き、「相棒にする」を選んでください。'); return; }
     if (buddy.syncRate >= 100) { setNotice('この相棒との絆は最大です。アイテムはバッグに残しました。'); return; }
     dispatch({ type: 'feed', id: item.id });
     setNotice(`${buddy.name}に${item.name}を渡しました。絆が深まった！`);
+  }
+
+  function petBuddy(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!buddy) return;
+    const reaction = buddyReaction(buddy, petCountToday);
+    if (petCountToday >= 3) {
+      setNotice(`${reaction} 今日、絆が深まるふれあいは3回まで。明日また遊ぼう。`);
+      return;
+    }
+    dispatch({ type: 'pet', date });
+    setNotice(buddy.syncRate >= 100
+      ? `${reaction} 最高の相棒との時間を楽しんだ。`
+      : `${reaction} 絆が少し深まった！（今日 ${petCountToday + 1}/3）`);
+  }
+
+  function captureCreature(id: string, behaviorVariantId?: string) {
+    dispatch({ type: 'capture', id, behaviorVariantId });
+    if (mission && activeArea && missionConditionsMet(mission, id, activeArea.id, time, progress.inventory)) {
+      dispatch({ type: 'missionComplete', id: mission.id });
+      setNotice('叔父さんの調査依頼を達成！ 追伸が届いた。');
+    }
   }
 
   if (screen === 'title') return <TitleScreen hasSave={progress.onboarded} onStart={() => setScreen(progress.onboarded ? 'game' : 'intro')} />;
@@ -106,23 +137,42 @@ export default function App() {
       {saveError && <div role="alert" className="bg-red-50 text-red-900 p-4 mb-4 rounded-xl border-2 border-red-300 flex gap-2"><p className="flex-1 text-sm">{saveError}</p><button aria-label="保存のお知らせを閉じる" onClick={dismissError}><X size={20} /></button></div>}
       {currentTab === 'explore' && <>
         <div className="flex justify-between items-center text-white text-xs font-bold mb-3 gap-2"><span>{progress.userName} 調査員</span><span>{saved ? '進捗は端末に自動保存' : '保存データを書き出してください'}</span></div>
+        <MissionCard mission={mission} completedCount={progress.completedMissionIds.length} total={MISSIONS.length} postscript={missionPostscript} onAcknowledgePostscript={id => dispatch({ type: 'missionSeen', id })} />
         <div className="rounded-2xl bg-[#fffaf2] p-4 mb-4 shadow-sm border border-amber-200">
           {count === TOTAL_CREATURES ? <div><h2 className="flex items-center gap-2 text-lg font-black text-amber-800"><Trophy />図鑑完成！ 帰り道がつながった</h2><p className="text-sm mt-2">全{TOTAL_CREATURES}種類の観測を達成。最後の通信を開こう。これからも相棒との調査は続けられます。</p></div>
           : <div><h2 className="font-black">{count === 0 ? '最初の1体を見つけよう' : `次の通信まで、あと${nextMilestone ? nextMilestone.milestone - count : 0}種類`}</h2><p className="text-sm text-stone-600 mt-1">{count === 0 ? '「調査に出発」から場所を選び、パラレル・カムで撮影しよう。' : count < 5 ? '5種類を発見すると、世界の隙間への道が開きます。' : '図鑑のスケッチに、生息地と観測時間のヒントがあります。'}</p></div>}
           {unread.length > 0 && <button onClick={() => setMessage(unread[0])} className="mt-3 bg-indigo-700 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2"><Mail size={18} />叔父さんからの新着通信（{unread.length}）</button>}
         </div>
-        <ExplorationView showNews={showNews} setShowNews={setShowNews} newsMessage={news} buddy={buddy} inventory={inventory} setShowInventory={setShowInventory}
-          timeConfig={{ label: time, icon: TIME_ICONS[time] }} currentTime={time} onTimeChange={setTime}
-          handleBuddyInteraction={e => { e.stopPropagation(); dispatch({ type: 'pet' }); }}
-          discoveredIds={progress.discoveredIds} onCapture={id => dispatch({ type: 'capture', id })} onFindItem={id => dispatch({ type: 'item', id })}
-          onCreatureClick={setSelectedCreature} activeArea={activeArea} onAreaSelect={setActiveArea} />
+        <ExplorationView
+          showNews={showNews}
+          setShowNews={setShowNews}
+          newsMessage={news}
+          activeMission={mission}
+          buddy={buddy}
+          buddyMemories={buddyMemories}
+          petCountToday={petCountToday}
+          inventory={inventory}
+          setShowInventory={setShowInventory}
+          timeConfig={{ label: time, icon: TIME_ICONS[time] }}
+          currentTime={time}
+          onTimeChange={setTime}
+          handleBuddyInteraction={petBuddy}
+          discoveredIds={progress.discoveredIds}
+          observations={progress.observations}
+          onCapture={captureCreature}
+          onFindItem={id => dispatch({ type: 'item', id })}
+          onStartExpedition={areaId => dispatch({ type: 'expedition', areaId })}
+          onCreatureClick={setSelectedCreature}
+          activeArea={activeArea}
+          onAreaSelect={setActiveArea}
+        />
       </>}
       {currentTab === 'gallery' && <GalleryView favorites={progress.favorites} discoveredIds={progress.discoveredIds} setShowBook={setShowBook} onCreatureClick={setSelectedCreature} />}
       {currentTab === 'journal' && <>
         <section className="bg-[#fffaf2] p-5 rounded-3xl mb-5 shadow-card border-2 border-amber-200">
           <h2 className="text-xl font-black mb-3 flex gap-2 items-center"><Mail />叔父さんとの通信記録</h2>
           <div className="space-y-2">{UNCLE_MESSAGES.map(m => <button key={m.milestone} disabled={count < m.milestone} onClick={() => setMessage(m)} className="block w-full text-left rounded-xl p-3 bg-white border border-amber-200 disabled:opacity-50 font-bold text-sm">{count >= m.milestone ? `${progress.readMilestones.includes(m.milestone) ? '✉' : '● 新着'} ${m.subject}` : `${m.milestone}種類の発見で届く通信`}</button>)}</div>
-          <p className="text-xs mt-4 text-stone-500">撮影成功 {progress.captures} 回 ・ 発見 {count} 種類</p>
+          <p className="text-xs mt-4 text-stone-500">撮影成功 {progress.captures} 回 ・ 発見 {count} 種類 ・ 調査依頼 {progress.completedMissionIds.length} / {MISSIONS.length}</p>
         </section>
         <JournalView favorites={progress.favorites} onCreatureClick={setSelectedCreature} />
       </>}
