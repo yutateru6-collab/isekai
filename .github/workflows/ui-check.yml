@@ -1,0 +1,49 @@
+name: Browser journeys and screenshots
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: browser-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test && npm run build
+      - name: Install browser test driver
+        run: python -m pip install 'playwright==1.55.0' 'Pillow==11.3.0'
+      - name: Start production preview
+        run: |
+          npm run preview -- --host 127.0.0.1 > /tmp/preview.log 2>&1 &
+          for i in {1..60}; do
+            curl -fsS http://127.0.0.1:4173/ >/dev/null && exit 0
+            sleep 0.5
+          done
+          cat /tmp/preview.log
+          exit 1
+      - name: Real browser interaction and screenshot assertions
+        env:
+          AUDIT_URL: http://127.0.0.1:4173
+        run: python scripts/ui-check.py
+      - name: Preserve screenshots and assertions even after a failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-evidence-${{ github.run_id }}
+          path: ui-evidence/
+          if-no-files-found: warn
+          retention-days: 14
