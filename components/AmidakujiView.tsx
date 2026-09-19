@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Creature, Item } from '../types';
+import React, { useState, useEffect, useRef } from 'react';
+import { Creature, Item, TimeOfDay } from '../types';
 import { HelpCircle, Gift, Footprints, Trees, Castle, Flag, Cloud, Sun, Mountain, Play } from 'lucide-react';
-import { CREATURES, ITEMS } from '../constants';
+import { ITEMS } from '../constants';
+import { eligibleCreatures, pickCreature } from '../services/game';
 
 interface AmidaPoint {
     x: number;
@@ -13,7 +14,7 @@ interface Bridge {
     rowY: number; // Vertical position (0-100)
 }
 
-interface Reward {
+export interface Reward {
     type: 'creature' | 'item' | 'empty';
     data?: Creature | Item;
     label: string;
@@ -21,18 +22,26 @@ interface Reward {
 
 interface AmidakujiViewProps {
     areaId: string;
+    time: TimeOfDay;
+    discoveredIds: string[];
+    rareBonus: boolean;
     onComplete: (reward: Reward) => void;
     onClose: () => void;
 }
 
 const LINES = 4;
 
-const AmidakujiView: React.FC<AmidakujiViewProps> = ({ areaId, onComplete, onClose }) => {
+const AmidakujiView: React.FC<AmidakujiViewProps> = ({ areaId, time, discoveredIds, rareBonus, onComplete, onClose }) => {
     const [bridges, setBridges] = useState<Bridge[]>([]);
     const [rewards, setRewards] = useState<Reward[]>([]);
     const [selectedLine, setSelectedLine] = useState<number>(1); // Default to lane 1 (0-indexed)
     const [charPos, setCharPos] = useState<AmidaPoint | null>(null);
     const [isWalking, setIsWalking] = useState(false);
+
+    const frame = useRef(0);
+    const completionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const walking = useRef(false);
+    useEffect(() => () => { cancelAnimationFrame(frame.current); if (completionTimer.current) clearTimeout(completionTimer.current); }, []);
 
     // Setup Game Board
     useEffect(() => {
@@ -52,23 +61,16 @@ const AmidakujiView: React.FC<AmidakujiViewProps> = ({ areaId, onComplete, onClo
         setBridges(newBridges);
 
         // 2. Generate Rewards
-        const potentialCreatures = CREATURES.filter(c => true);
-        const rareCreature = potentialCreatures.find(c => c.dangerLevel >= 4) || potentialCreatures[0];
-        const commonCreature = potentialCreatures.find(c => c.dangerLevel <= 2) || potentialCreatures[1];
+        const pool = eligibleCreatures(areaId, time, discoveredIds);
+        const first = pickCreature(pool, discoveredIds, rareBonus);
+        const second = pickCreature(pool.filter(c => c.id !== first?.id), discoveredIds, rareBonus) ?? first;
         const item = ITEMS[Math.floor(Math.random() * ITEMS.length)];
-
-        // Always have at least one creature, one item, one empty
         const newRewards: Reward[] = [
-            { type: 'creature', data: rareCreature, label: '強反応' },
-            { type: 'creature', data: commonCreature, label: '生体反応' },
+            first ? { type: 'creature', data: first, label: '生体反応' } : { type: 'item', data: item, label: 'アイテム' },
+            second ? { type: 'creature', data: second, label: '生体反応' } : { type: 'item', data: item, label: 'アイテム' },
             { type: 'item', data: item, label: 'アイテム' },
-            { type: 'empty', label: '反応なし' }
+            first ? { type: 'creature', data: pickCreature(pool, discoveredIds, rareBonus), label: '生体反応' } : { type: 'item', data: item, label: 'アイテム' }
         ];
-
-        // Ensure 4 items
-        while (newRewards.length < LINES) {
-            newRewards.push({ type: 'empty', label: '反応なし' });
-        }
 
         // Shuffle
         for (let i = newRewards.length - 1; i > 0; i--) {
@@ -77,7 +79,7 @@ const AmidakujiView: React.FC<AmidakujiViewProps> = ({ areaId, onComplete, onClo
         }
         setRewards(newRewards.slice(0, LINES));
 
-    }, [areaId]);
+    }, [areaId, time]);
 
     const calculatePath = (startCol: number) => {
         const path: AmidaPoint[] = [];
@@ -124,7 +126,8 @@ const AmidakujiView: React.FC<AmidakujiViewProps> = ({ areaId, onComplete, onClo
     };
 
     const handleStart = () => {
-        if (isWalking) return;
+        if (walking.current || !rewards.length) return;
+        walking.current = true;
         setIsWalking(true);
         setCharPos({ x: getColX(selectedLine), y: 0 });
 
@@ -134,9 +137,10 @@ const AmidakujiView: React.FC<AmidakujiViewProps> = ({ areaId, onComplete, onClo
         let ptIndex = 0;
         let progress = 0;
 
-        const animate = () => {
+        let previousTime = 0;
+        const animate = (now: number) => {
             if (ptIndex >= path.length - 1) {
-                setTimeout(() => {
+                completionTimer.current = setTimeout(() => {
                     onComplete(rewards[finalCol]);
                 }, 800);
                 return;
@@ -149,25 +153,26 @@ const AmidakujiView: React.FC<AmidakujiViewProps> = ({ areaId, onComplete, onClo
             const dy = endPt.y - startPt.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
 
-            const step = 0.8; // Speed
+            const step = Math.min(previousTime ? now - previousTime : 16, 50) * 0.06;
+            previousTime = now;
             progress += step;
 
             if (progress >= dist) {
                 progress = 0;
                 ptIndex++;
                 setCharPos(endPt);
-                requestAnimationFrame(animate);
+                frame.current = requestAnimationFrame(animate);
             } else {
                 const ratio = progress / dist;
                 setCharPos({
                     x: startPt.x + dx * ratio,
                     y: startPt.y + dy * ratio
                 });
-                requestAnimationFrame(animate);
+                frame.current = requestAnimationFrame(animate);
             }
         };
 
-        requestAnimationFrame(animate);
+        frame.current = requestAnimationFrame(animate);
     };
 
 
@@ -217,7 +222,7 @@ const AmidakujiView: React.FC<AmidakujiViewProps> = ({ areaId, onComplete, onClo
     };
 
     return (
-        <div className={`absolute inset-0 z-50 flex flex-col items-center justify-center overflow-hidden ${config.bgColor}`}>
+        <div className={`absolute inset-0 z-50 flex flex-col items-center justify-start min-h-[100dvh] overflow-y-auto py-3 px-2 ${config.bgColor}`}>
             {/* Background Decor - Sky & Ground */}
             <div className="absolute inset-0 pointer-events-none">
                 {/* Sky */}
@@ -228,21 +233,23 @@ const AmidakujiView: React.FC<AmidakujiViewProps> = ({ areaId, onComplete, onClo
             </div>
 
             {/* Header */}
-            <div className={`z-10 bg-white/90 px-8 py-3 rounded-full shadow-lg border-4 ${config.borderColor} mb-4 mt-8 animate-bounce`}>
+            <div className={`z-10 bg-white/90 px-8 py-3 rounded-full shadow-lg border-4 ${config.borderColor} mb-3 mt-2 shrink-0`}>
                 <h2 className={`text-xl font-black ${config.themeColor} tracking-widest`}>散策ルートを選ぼう！</h2>
             </div>
 
             {/* Game Board */}
-            <div className="relative w-full max-w-lg h-[70vh] bg-white/60 backdrop-blur-sm rounded-[40px] border-8 border-white shadow-2xl p-6 flex flex-col justify-between overflow-hidden">
+            <div className="relative w-full max-w-lg h-[55dvh] min-h-[280px] shrink-0 bg-white/60 backdrop-blur-sm rounded-[40px] border-8 border-white shadow-2xl p-3 sm:p-6 flex flex-col justify-between overflow-hidden">
 
                 {/* Entrances (Move Selection) */}
                 <div className="relative h-20 w-full z-30">
                     {Array.from({ length: LINES }).map((_, i) => (
                         <button
                             key={i}
+                            aria-label={`ルート${i + 1}`}
+                            aria-pressed={selectedLine === i}
                             onClick={() => handleLaneClick(i)}
                             disabled={isWalking}
-                            className={`absolute -translate-x-1/2 -top-2 w-16 h-full transition-colors rounded-xl ${selectedLine === i ? 'bg-pop-blue/10' : 'hover:bg-gray-100/50'}`}
+                            className={`absolute -translate-x-1/2 -top-2 w-12 sm:w-16 h-full transition-colors rounded-xl ${selectedLine === i ? 'bg-pop-blue/10' : 'hover:bg-gray-100/50'}`}
                             style={{ left: `${getColX(i)}%` }}
                         >
                             {/* Visual Indicator of Lane */}
@@ -349,7 +356,7 @@ const AmidakujiView: React.FC<AmidakujiViewProps> = ({ areaId, onComplete, onClo
                             className="absolute -translate-x-1/2 flex flex-col items-center group cursor-help transition-transform hover:scale-110 hover:-translate-y-1"
                             style={{ left: `${getColX(i)}%`, top: 0 }}
                         >
-                            <div className={`w-16 h-16 bg-white rounded-2xl border-[5px] shadow-lg flex items-center justify-center overflow-hidden mb-2 relative ${reward.type === 'creature' ? 'border-pop-pink' :
+                            <div className={`w-12 h-12 sm:w-16 sm:h-16 bg-white rounded-2xl border-[5px] shadow-lg flex items-center justify-center overflow-hidden mb-2 relative ${reward.type === 'creature' ? 'border-pop-pink' :
                                 reward.type === 'item' ? 'border-pop-yellow' : 'border-gray-200'
                                 }`}>
                                 {reward.type === 'creature' && reward.data && (
@@ -383,11 +390,11 @@ const AmidakujiView: React.FC<AmidakujiViewProps> = ({ areaId, onComplete, onClo
             </div>
 
             {/* Footer Controls */}
-            <div className="mt-6 flex flex-col items-center gap-4 z-50">
+            <div className="mt-3 pb-5 flex flex-col items-center gap-2 z-50 shrink-0">
                 {!isWalking ? (
                     <button
                         onClick={handleStart}
-                        className="bg-pop-blue text-white text-xl font-black px-12 py-3 rounded-full shadow-pop hover:shadow-pop-hover border-4 border-white transition-transform hover:scale-105 active:scale-95 flex items-center gap-2"
+                        className="bg-pop-blue text-white text-base sm:text-xl font-black px-6 sm:px-12 py-3 rounded-full shadow-pop hover:shadow-pop-hover border-4 border-white transition-transform hover:scale-105 active:scale-95 flex items-center gap-2"
                     >
                         <Play className="w-6 h-6 fill-current" />
                         このルートで出発！
@@ -398,7 +405,7 @@ const AmidakujiView: React.FC<AmidakujiViewProps> = ({ areaId, onComplete, onClo
                     </div>
                 )}
 
-                {!isWalking && (
+                {(
                     <button onClick={onClose} className="text-gray-400 font-bold text-sm underline hover:text-gray-600">
                         探索をやめる
                     </button>

@@ -30,6 +30,8 @@ const CreatureCard: React.FC<CreatureCardProps> = ({ creature, onClick, isNew, i
 
       return (
         <div
+          role="button" tabIndex={0} aria-label={`${creature.name}のスケッチを見る`}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(creature); } }}
           onClick={() => onClick(creature)}
           className="group relative h-full cursor-pointer"
         >
@@ -40,6 +42,7 @@ const CreatureCard: React.FC<CreatureCardProps> = ({ creature, onClick, isNew, i
             <div className="w-full aspect-square mb-2 overflow-hidden rounded-xl border-2 border-[#D7CCC8] bg-[#FFFDE7] relative flex items-center justify-center">
               <img
                 src={creature.sketchUrl}
+                loading="lazy"
                 alt={creature.name}
                 className="w-full h-full object-contain p-1"
               />
@@ -87,6 +90,8 @@ const CreatureCard: React.FC<CreatureCardProps> = ({ creature, onClick, isNew, i
 
   return (
     <div
+      role="button" tabIndex={0} aria-label={`${creature.name}の観測記録を見る`}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(creature); } }}
       onClick={() => onClick(creature)}
       className="group relative h-full cursor-pointer perspective-1000"
     >

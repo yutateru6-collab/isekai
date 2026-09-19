@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { UserCircle2, Sun, Moon, Sunrise, Sunset, Book } from 'lucide-react';
-import { CREATURES, APP_NAME, ITEMS, SEARCH_AREAS } from './constants';
-import { Creature, TimeOfDay, Item, SearchArea, NewsData } from './types';
+import React, { useEffect, useState } from 'react';
+import { Book, Settings, Mail, Sunrise, Sun, Sunset, Moon, Trophy, X } from 'lucide-react';
+import { APP_NAME, CREATURES, ITEMS } from './constants';
+import { Creature, Item, SearchArea, TimeOfDay } from './types';
 import { UNCLE_MESSAGES, UncleMessage } from './data/uncleMessages';
+import { currentTimeOfDay, dailyNews, localDate, TOTAL_CREATURES } from './services/game';
+import { useProgress } from './services/useProgress';
 import CreatureDetailModal from './components/CreatureDetailModal';
 import BottomNav from './components/BottomNav';
 import Prologue from './components/Prologue';
@@ -10,479 +12,128 @@ import RealisticBook from './components/RealisticBook';
 import TitleScreen from './components/TitleScreen';
 import UncleMessageModal from './components/UncleMessageModal';
 import IntroStoryModal from './components/IntroStoryModal';
-
-// Views
 import ExplorationView from './components/ExplorationView';
 import GalleryView from './components/GalleryView';
 import JournalView from './components/JournalView';
 import InventoryModal from './components/InventoryModal';
+import SettingsModal from './components/SettingsModal';
 
-const getCurrentTimeOfDay = (): TimeOfDay => {
-  const hour = new Date().getHours();
-  if (hour >= 5 && hour < 10) return TimeOfDay.Morning;
-  if (hour >= 10 && hour < 16) return TimeOfDay.Day;
-  if (hour >= 16 && hour < 19) return TimeOfDay.Sunset;
-  return TimeOfDay.Night;
-};
+const TIME_ICONS = { [TimeOfDay.Morning]: Sunrise, [TimeOfDay.Day]: Sun, [TimeOfDay.Sunset]: Sunset, [TimeOfDay.Night]: Moon, [TimeOfDay.Any]: Sun };
 
-const getTimeConfig = (time: TimeOfDay) => {
-  switch (time) {
-    case TimeOfDay.Morning: return { icon: Sunrise, label: '早朝', color: 'text-pop-blue', bgOverlay: 'bg-yellow-100/10' };
-    case TimeOfDay.Day: return { icon: Sun, label: '日中', color: 'text-pop-yellow', bgOverlay: 'bg-white/0' };
-    case TimeOfDay.Sunset: return { icon: Sunset, label: '夕暮れ', color: 'text-pop-pink', bgOverlay: 'bg-orange-500/20 mix-blend-overlay' };
-    case TimeOfDay.Night: return { icon: Moon, label: '深夜', color: 'text-pop-purple', bgOverlay: 'bg-indigo-900/40' };
-    default: return { icon: Sun, label: '不明', color: 'text-gray-500', bgOverlay: 'bg-white/10' };
-  }
-};
-
-function App() {
-  const [showTitle, setShowTitle] = useState(true);
-  const [showIntroStory, setShowIntroStory] = useState(false);
-  const [showPrologue, setShowPrologue] = useState(false);
-  const [userName, setUserName] = useState('調査員');
+export default function App() {
+  const { progress, dispatch, saveError, saved, dismissError } = useProgress();
+  const [screen, setScreen] = useState<'title' | 'intro' | 'prologue' | 'game'>('title');
   const [currentTab, setCurrentTab] = useState('explore');
   const [selectedCreature, setSelectedCreature] = useState<Creature | null>(null);
-  const [favorites, setFavorites] = useState<string[]>([]);
-
-  // Lifted State for ExplorationView
   const [activeArea, setActiveArea] = useState<SearchArea | null>(null);
-
-  // Features State
-  const [buddy, setBuddy] = useState<Creature | null>(null);
-  const [showNews, setShowNews] = useState(false);
-  const [newsMessage, setNewsMessage] = useState<NewsData | null>(null);
-  const [lastLogin, setLastLogin] = useState<number>(() => {
-    const stored = localStorage.getItem('lastLoginTime');
-    return stored ? parseInt(stored) : Date.now();
-  });
-
-  const [currentTime, setCurrentTime] = useState<TimeOfDay>(getCurrentTimeOfDay());
-  const [discoveredIds, setDiscoveredIds] = useState<string[]>(['011', '012', '013']);
-  const [inventory, setInventory] = useState<Item[]>([]);
-  const [showInventory, setShowInventory] = useState(false);
+  const [showNews, setShowNews] = useState(true);
   const [showBook, setShowBook] = useState(false);
-  const [showDoctor, setShowDoctor] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
+  const [showInventory, setShowInventory] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [message, setMessage] = useState<UncleMessage | null>(null);
+  const [notice, setNotice] = useState('');
+  const [date, setDate] = useState(localDate);
+  const [time, setTime] = useState<TimeOfDay>(currentTimeOfDay);
+  const news = dailyNews(date);
+  const inventory = progress.inventory.map(id => ITEMS.find(i => i.id === id)!).filter(Boolean);
+  const buddyData = CREATURES.find(c => c.id === progress.buddyId);
+  const buddy: Creature | null = buddyData ? { ...buddyData, role: 'buddy', syncRate: progress.bonds[buddyData.id] ?? 0 } : null;
+  const count = progress.discoveredIds.length;
+  const rate = Math.round(count / TOTAL_CREATURES * 100);
+  const unread = UNCLE_MESSAGES.filter(m => m.milestone <= count && !progress.readMilestones.includes(m.milestone));
+  const nextMilestone = UNCLE_MESSAGES.find(m => m.milestone > count);
 
-  // --- LOGIN BONUS & NEWS LOGIC ---
   useEffect(() => {
-    const now = Date.now();
-    const diffHours = (now - lastLogin) / (1000 * 60 * 60);
-
-    if (diffHours >= 1) {
-      const chance = buddy ? 0.8 : 0.3;
-      if (Math.random() < chance) {
-        const randomItem = ITEMS[Math.floor(Math.random() * ITEMS.length)];
-        setInventory(prev => [...prev, randomItem]);
-        setTimeout(() => {
-          alert(buddy
-            ? `相棒の ${buddy.name} が ${randomItem.name} を拾ってきた！`
-            : `おや？ ${randomItem.name} が落ちている...`
-          );
-        }, 1000);
-      }
-      localStorage.setItem('lastLoginTime', now.toString());
-      setLastLogin(now);
-    }
-
-    const checkAndGenerateNews = () => {
-      const today = new Date().toISOString().split('T')[0];
-      const storedNewsJson = localStorage.getItem(`news_${today}`);
-
-      if (storedNewsJson) {
-        setNewsMessage(JSON.parse(storedNewsJson));
-        setShowNews(true);
-        return;
-      }
-
-      // Generate New News
-      const types: ('forecast' | 'trivia' | 'advice' | 'lucky')[] = ['forecast', 'trivia', 'advice', 'lucky'];
-      // Increase probability of 'forecast' or 'lucky' if not seen recently? Random for now.
-      const type = types[Math.floor(Math.random() * types.length)];
-      let title = '観測ログ';
-      let content = '';
-      let luckyItemId: string | undefined;
-      let bonusAreaId: string | undefined;
-
-      if (type === 'forecast') {
-        const area = SEARCH_AREAS[Math.floor(Math.random() * SEARCH_AREAS.length)];
-        title = 'バイオ予報';
-        content = `本日は「${area.label}」での観測により、レア生物発見の可能性が高まっています。`;
-        bonusAreaId = area.id;
-      } else if (type === 'lucky') {
-        const item = ITEMS[Math.floor(Math.random() * ITEMS.length)];
-        title = 'ラッキーアイテム';
-        content = `本日のラッキーアイテムは「${item.name}」です。所持していると良いことがあるかもしれません。`;
-        luckyItemId = item.id;
-      } else if (type === 'trivia') {
-        const targetId = discoveredIds.length > 0 ? discoveredIds[Math.floor(Math.random() * discoveredIds.length)] : CREATURES[0].id;
-        const target = CREATURES.find(c => c.id === targetId);
-        title = '豆知識';
-        content = target ? target.trivia[Math.floor(Math.random() * target.trivia.length)] : '観察を続けることで新たな発見があるだろう。';
-      } else {
-        title = '博士の助言';
-        content = 'アイテムは相棒に与えることで、より深い絆が生まれるぞ。同じ属性のアイテムだと効果が高いらしい。';
-      }
-
-      const newNews = { date: today, type, title, content, luckyItemId, bonusAreaId };
-      localStorage.setItem(`news_${today}`, JSON.stringify(newNews));
-      setNewsMessage(newNews);
-      setShowNews(true);
-    };
-
-    checkAndGenerateNews();
-
-    const timer = setInterval(() => {
-      setCurrentTime(getCurrentTimeOfDay());
-    }, 60000);
-
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      clearInterval(timer);
-    };
+    const timer = setInterval(() => setDate(localDate()), 60_000);
+    return () => clearInterval(timer);
   }, []);
-
-  // --- UNCLE MESSAGE LOGIC ---
-  const [showUncleMessage, setShowUncleMessage] = useState(false);
-  const [currentUncleMessage, setCurrentUncleMessage] = useState<UncleMessage | null>(null);
-
   useEffect(() => {
-    const checkUncleMessages = () => {
-      const count = discoveredIds.length;
-      if (count === 0) return;
-
-      const milestones = [10, 20, 30, 40, 50];
-      const reachedMilestones = milestones.filter(m => count >= m);
-      if (reachedMilestones.length === 0) return;
-
-      const latestMilestone = reachedMilestones[reachedMilestones.length - 1];
-      const shownMilestoneStr = localStorage.getItem('uncle_message_last_shown_milestone');
-      const lastShownMilestone = shownMilestoneStr ? parseInt(shownMilestoneStr) : 0;
-
-      if (latestMilestone > lastShownMilestone) {
-        const message = UNCLE_MESSAGES.find(m => m.milestone === latestMilestone);
-        if (message) {
-          setCurrentUncleMessage(message);
-          setShowUncleMessage(true);
-          localStorage.setItem('uncle_message_last_shown_milestone', latestMilestone.toString());
-        }
-      }
+    if (screen !== 'game' || !progress.onboarded || date <= progress.lastRewardDate) return;
+    dispatch({ type: 'daily', date, itemId: 'item_candy' });
+    setNotice('今日の調査支給品：異世界のキャンディをバッグに入れました。');
+  }, [screen, progress.onboarded, progress.lastRewardDate, date]);
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(''), 4500);
+    return () => clearTimeout(timer);
+  }, [notice]);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (message) closeMessage();
+      else if (showSettings) setShowSettings(false);
+      else if (showInventory) setShowInventory(false);
+      else if (selectedCreature) setSelectedCreature(null);
+      else if (showBook) setShowBook(false);
     };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [message, showSettings, showInventory, selectedCreature, showBook]);
 
-    checkUncleMessages();
-  }, [discoveredIds.length]);
-
-  const timeConfig = getTimeConfig(currentTime);
-
-  const toggleFavorite = (id: string) => {
-    setFavorites(prev =>
-      prev.includes(id) ? prev.filter(fId => fId !== id) : [...prev, id]
-    );
-  };
-
-  const handleCreatureClick = (creature: Creature) => {
-    if (!discoveredIds.includes(creature.id) && !creature.sketchUrl) return;
-    setSelectedCreature(creature);
-  };
-
-  const discoveryRate = Math.round((discoveredIds.length / 50) * 100);
-
-  // Buddy Logic
-  const handleSetBuddy = (creature: Creature) => {
-    // Check if we are resetting buddy or setting a new one
-    // Ensure syncRate is carried over if it's the same species?
-    // For now, simple implementation: set buddy.
-    const newBuddy = { ...creature, role: 'buddy', syncRate: creature.syncRate || 0 };
-    setBuddy(newBuddy as Creature);
-    alert(`${creature.name} を相棒に設定しました！`);
-  };
-
-  const evolveBuddy = (currentBuddy: Creature) => {
-    if (!currentBuddy.evolvesTo) return;
-    const evolvedForm = CREATURES.find(c => c.id === currentBuddy.evolvesTo);
-    if (evolvedForm) {
-      setBuddy({
-        ...evolvedForm,
-        role: 'buddy',
-        syncRate: 100, // Keep max sync
-        evolutionLevel: (currentBuddy.evolutionLevel || 1) + 1
-      } as Creature);
-      alert(`おめでとう！ ${currentBuddy.name} は ${evolvedForm.name} に進化した！`);
-    } else {
-      // If logic says evolved but data missing
-      setBuddy(prev => prev ? { ...prev, evolutionLevel: (prev.evolutionLevel || 1) + 1 } : null);
-      alert(`${currentBuddy.name} の様子が……？ (データ未実装のためレベルのみ上昇)`);
-    }
-  };
-
-  const updateSyncRate = (amount: number) => {
-    if (!buddy) return;
-    setBuddy(prev => {
-      if (!prev) return null;
-      const newRate = Math.min(100, (prev.syncRate || 0) + amount);
-      if ((prev.syncRate || 0) < 100 && newRate >= 100) {
-        setTimeout(() => {
-          if (prev.evolutionLevel === 1) {
-            if (window.confirm(`⚡ ${prev.name} との絆が MAX になった！ ⚡\n進化させますか？`)) {
-              evolveBuddy(prev);
-            }
-          } else {
-            alert(`⚡ ${prev.name} との絆が MAX になった！ ⚡`);
-          }
-        }, 500);
-      }
-      return { ...prev, syncRate: newRate };
-    });
-  };
-
-  const handleBuddyInteraction = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!buddy) return;
-    // Cap sync increase by clicking for gameplay balance?
-    // For now, let them click.
-    if (buddy.syncRate < 100) {
-      updateSyncRate(1);
-    } else if (buddy.evolutionLevel === 1) {
-      // Manual trigger for max sync
-      if (window.confirm(`${buddy.name} は進化の準備ができています！進化させますか？`)) {
-        evolveBuddy(buddy);
-      }
-    }
-  };
-
-  const handleUseItem = (item: Item) => {
-    if (!buddy) {
-      alert("相棒がいません。まずは相棒を決めよう！");
-      return;
-    }
-    const index = inventory.findIndex(i => i.id === item.id);
-    if (index > -1) {
-      const newInv = [...inventory];
-      newInv.splice(index, 1);
-      setInventory(newInv);
-      updateSyncRate(item.effectValue);
-      alert(`${buddy.name} に ${item.name} をあげた！\nシンクロ率が ${item.effectValue} 上がった！`);
-    }
-  };
-
-  // --- RENDER ---
-  if (showTitle) {
-    return <TitleScreen onStart={() => {
-      setShowTitle(false);
-      setShowIntroStory(true);
-    }} />;
+  function closeMessage() {
+    if (message) dispatch({ type: 'read', milestone: message.milestone });
+    setMessage(null);
+  }
+  function feed(item: Item) {
+    if (!buddy) { setNotice('図鑑の発見済み生物を開き、「相棒にする」を選んでください。'); return; }
+    if (buddy.syncRate >= 100) { setNotice('この相棒との絆は最大です。アイテムはバッグに残しました。'); return; }
+    dispatch({ type: 'feed', id: item.id });
+    setNotice(`${buddy.name}に${item.name}を渡しました。絆が深まった！`);
   }
 
-  if (showIntroStory) {
-    return <IntroStoryModal onComplete={() => {
-      setShowIntroStory(false);
-      setShowPrologue(true);
-    }} />;
-  }
+  if (screen === 'title') return <TitleScreen hasSave={progress.onboarded} onStart={() => setScreen(progress.onboarded ? 'game' : 'intro')} />;
+  if (screen === 'intro') return <IntroStoryModal onComplete={() => setScreen('prologue')} />;
+  if (screen === 'prologue') return <Prologue onComplete={name => { dispatch({ type: 'register', name }); setScreen('game'); }} />;
 
-  if (showPrologue) {
-    return <Prologue onComplete={(name) => {
-      setUserName(name);
-      setShowPrologue(false);
-    }} />;
-  }
-
-  return (
-    <div
-      className="min-h-screen font-maru pb-32 overflow-x-hidden relative transition-colors duration-1000"
-      style={{
-        backgroundImage: `url('/image/home_bg_desk.png')`,
-        backgroundSize: 'contain',
-        backgroundPosition: 'center',
-        backgroundAttachment: 'fixed',
-        backgroundRepeat: 'no-repeat',
-        backgroundColor: '#3E2723'
-      }}
-    >
-      {/* REALISTIC BOOK OVERLAY */}
-      {showBook && (
-        <RealisticBook
-          creatures={CREATURES}
-          discoveredIds={discoveredIds}
-          onClose={() => setShowBook(false)}
-        />
-      )}
-
-      {/* Header */}
-      <header
-        className={`sticky top-0 z-30 transition-all duration-300 ${scrolled
-          ? 'glass-panel py-2 rounded-b-3xl shadow-sm mx-2'
-          : 'bg-white/80 backdrop-blur-sm py-4 border-b-2 border-dashed border-gray-200'
-          }`}
-      >
-        <div className="container mx-auto px-4 max-w-3xl flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-14 h-14 rounded-full bg-white border-4 border-white flex items-center justify-center shadow-pop overflow-hidden">
-              <img src="/char/explorer.png" alt="Explorer" className="w-full h-full object-cover transform scale-110" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-black text-xl text-kids-text tracking-wide drop-shadow-sm">
-                  {APP_NAME}
-                </h1>
-                <button
-                  onClick={() => setShowBook(true)}
-                  className="bg-[#3E2723] p-1.5 rounded-lg border-2 border-[#5D4037] text-white shadow-sm active:scale-95 transition-transform hover:bg-[#5D4037]"
-                  title="図鑑を開く"
-                >
-                  <Book className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1 text-xs font-bold text-gray-500">
-                  <span className="bg-white px-2 py-0.5 rounded-full shadow-sm">観測進捗</span>
-                </div>
-                <div className="w-24 h-4 bg-white rounded-full overflow-hidden border-2 border-gray-100">
-                  <div
-                    className="h-full bg-pop-green transition-all duration-1000 rounded-full"
-                    style={{ width: `${Math.max(5, discoveryRate)}%` }}
-                  ></div>
-                </div>
-                <span className="text-sm font-black text-pop-green">{discoveryRate}%</span>
-              </div>
-            </div>
-          </div>
-          <div className="hidden sm:flex flex-col items-end">
-            <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full shadow-sm border-2 border-pop-blue cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => setShowDoctor(true)}>
-              <UserCircle2 className="w-5 h-5 text-pop-blue" />
-              <span className="text-sm font-bold text-kids-text">{userName} 調査員</span>
-            </div>
+  return <div className="min-h-screen font-maru pb-32 overflow-x-hidden relative" style={{ background: "linear-gradient(#3e272330,#3e272360), url('/image/home_bg_desk.png') center / cover fixed" }}>
+    <header className="sticky top-0 z-30 bg-[#fffaf2]/95 backdrop-blur border-b-2 border-amber-200 py-3">
+      <div className="mx-auto px-3 max-w-3xl flex gap-2 items-center justify-between">
+        <div className="min-w-0">
+          <h1 className="font-black text-lg sm:text-xl text-[#5d4037]">{APP_NAME}</h1>
+          <div className="flex gap-2 items-center mt-1 text-xs font-bold">
+            <span>発見 {count} / {TOTAL_CREATURES} 種</span>
+            <div role="progressbar" aria-label="図鑑の完成度" aria-valuenow={rate} aria-valuemin={0} aria-valuemax={100} className="w-16 sm:w-24 h-2 bg-amber-100 rounded-full overflow-hidden"><div className="h-full bg-emerald-600 transition-all" style={{ width: `${rate}%` }} /></div>
+            <span>{rate}%</span>
           </div>
         </div>
-      </header>
-
-      <main className="container mx-auto px-4 max-w-3xl mt-6 relative z-10">
-
-        {/* === EXPLORE TAB === */}
-        {currentTab === 'explore' && (
-          <ExplorationView
-            showNews={showNews}
-            setShowNews={setShowNews}
-            newsMessage={newsMessage}
-            buddy={buddy}
-            inventory={inventory}
-            setShowInventory={setShowInventory}
-            timeConfig={timeConfig}
-            handleBuddyInteraction={handleBuddyInteraction}
-            setShowBook={setShowBook}
-            discoveredIds={discoveredIds}
-            setDiscoveredIds={setDiscoveredIds}
-            setInventory={setInventory}
-            onCreatureClick={handleCreatureClick}
-            userName={userName}
-            activeArea={activeArea}
-            onAreaSelect={setActiveArea}
-          />
-        )}
-
-        {/* === GALLERY TAB === */}
-        {currentTab === 'gallery' && (
-          <GalleryView
-            favorites={favorites}
-            discoveredIds={discoveredIds}
-            setShowBook={setShowBook}
-            onCreatureClick={handleCreatureClick}
-          />
-        )}
-
-        {/* === JOURNAL TAB === */}
-        {currentTab === 'journal' && (
-          <JournalView
-            favorites={favorites}
-            onCreatureClick={handleCreatureClick}
-          />
-        )}
-
-      </main>
-
-      {!activeArea && <BottomNav currentTab={currentTab} onTabChange={setCurrentTab} />}
-
-      <CreatureDetailModal
-        creature={selectedCreature}
-        onClose={() => setSelectedCreature(null)}
-        isFavorite={selectedCreature ? favorites.includes(selectedCreature.id) : false}
-        onToggleFavorite={toggleFavorite}
-        userName={userName}
-        onSetBuddy={handleSetBuddy}
-        buddyId={buddy ? buddy.id : null}
-        isLocked={selectedCreature ? !discoveredIds.includes(selectedCreature.id) : false}
-      />
-
-      <InventoryModal
-        isOpen={showInventory}
-        onClose={() => setShowInventory(false)}
-        inventory={inventory}
-        onUseItem={handleUseItem}
-      />
-
-      {/* Uncle Message Modal */}
-      {showUncleMessage && currentUncleMessage && (
-        <UncleMessageModal
-          message={currentUncleMessage}
-          onClose={() => setShowUncleMessage(false)}
-          userName={userName}
-        />
-      )}
-
-      {/* Doctor Modal */}
-      {showDoctor && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setShowDoctor(false)}>
-          <div className="relative bg-white rounded-xl p-6 max-w-sm w-full shadow-2xl flex flex-col items-center gap-4 animate-in fade-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
-            <h2 className="text-xl font-black text-[#5D4037]">パラレル生物博士</h2>
-            <div className="w-full max-h-[60vh] overflow-hidden rounded-lg shadow-lg">
-              <img src="/image/title_key_visual.png" alt="Doctor" className="w-full h-full object-contain" />
-            </div>
-            <p className="text-sm text-gray-600 text-center font-bold">
-              「いつでも連絡してくれ給え！<br />……と言いたいところだが、<br />通信料が高いので程々にな！」
-            </p>
-            <button
-              onClick={() => setShowDoctor(false)}
-              className="mt-2 bg-[#5D4037] text-white px-6 py-2 rounded-full font-bold hover:bg-[#3E2723] transition-colors"
-            >
-              閉じる
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* DEBUG TOOLS */}
-      <div className="fixed bottom-20 left-4 z-[9999] bg-black/50 p-2 rounded-lg backdrop-blur-md border border-white/20">
-        <p className="text-[10px] text-white font-mono mb-1">DEV TOOLS</p>
-        <div className="flex flex-col gap-1">
-          <div className="flex gap-1">
-            <button onClick={() => { localStorage.removeItem('uncle_message_last_shown_milestone'); alert('Reset Uncle Message History'); }} className="bg-red-500 text-white text-xs px-2 py-1 rounded">Reset Msg</button>
-            <button onClick={() => { setDiscoveredIds([]); alert('Reset Discovered IDs'); }} className="bg-red-500 text-white text-xs px-2 py-1 rounded">Reset Dex</button>
-          </div>
-          <div className="flex gap-1 flex-wrap w-32">
-            {[10, 20, 30, 40, 50].map(num => (
-              <button
-                key={num}
-                onClick={() => {
-                  // Generate dummy IDs to match count
-                  const dummyIds = Array.from({ length: num }, (_, i) => `debug_${i}`);
-                  setDiscoveredIds(dummyIds);
-                  alert(`Set debug count to ${num}`);
-                }}
-                className="bg-blue-500 text-white text-xs px-2 py-1 rounded hover:bg-blue-600"
-              >
-                Set {num}
-              </button>
-            ))}
-          </div>
+        <div className="flex gap-1 shrink-0">
+          <button onClick={() => setShowBook(true)} aria-label="図鑑を開く" className="p-3 rounded-xl text-[#5d4037] hover:bg-amber-100"><Book size={22} /></button>
+          <button onClick={() => setShowSettings(true)} aria-label="設定を開く" className="p-3 rounded-xl text-[#5d4037] hover:bg-amber-100"><Settings size={22} /></button>
         </div>
       </div>
-
-    </div>
-  );
+    </header>
+    <main className="mx-auto px-4 max-w-3xl mt-5 relative">
+      {saveError && <div role="alert" className="bg-red-50 text-red-900 p-4 mb-4 rounded-xl border-2 border-red-300 flex gap-2"><p className="flex-1 text-sm">{saveError}</p><button aria-label="保存のお知らせを閉じる" onClick={dismissError}><X size={20} /></button></div>}
+      {currentTab === 'explore' && <>
+        <div className="flex justify-between items-center text-white text-xs font-bold mb-3 gap-2"><span>{progress.userName} 調査員</span><span>{saved ? '進捗は端末に自動保存' : '保存データを書き出してください'}</span></div>
+        <div className="rounded-2xl bg-[#fffaf2] p-4 mb-4 shadow-sm border border-amber-200">
+          {count === TOTAL_CREATURES ? <div><h2 className="flex items-center gap-2 text-lg font-black text-amber-800"><Trophy />図鑑完成！ 帰り道がつながった</h2><p className="text-sm mt-2">全{TOTAL_CREATURES}種類の観測を達成。最後の通信を開こう。これからも相棒との調査は続けられます。</p></div>
+          : <div><h2 className="font-black">{count === 0 ? '最初の1体を見つけよう' : `次の通信まで、あと${nextMilestone ? nextMilestone.milestone - count : 0}種類`}</h2><p className="text-sm text-stone-600 mt-1">{count === 0 ? '「調査に出発」から場所を選び、パラレル・カムで撮影しよう。' : count < 5 ? '5種類を発見すると、世界の隙間への道が開きます。' : '図鑑のスケッチに、生息地と観測時間のヒントがあります。'}</p></div>}
+          {unread.length > 0 && <button onClick={() => setMessage(unread[0])} className="mt-3 bg-indigo-700 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2"><Mail size={18} />叔父さんからの新着通信（{unread.length}）</button>}
+        </div>
+        <ExplorationView showNews={showNews} setShowNews={setShowNews} newsMessage={news} buddy={buddy} inventory={inventory} setShowInventory={setShowInventory}
+          timeConfig={{ label: time, icon: TIME_ICONS[time] }} currentTime={time} onTimeChange={setTime}
+          handleBuddyInteraction={e => { e.stopPropagation(); dispatch({ type: 'pet' }); }}
+          discoveredIds={progress.discoveredIds} onCapture={id => dispatch({ type: 'capture', id })} onFindItem={id => dispatch({ type: 'item', id })}
+          onCreatureClick={setSelectedCreature} activeArea={activeArea} onAreaSelect={setActiveArea} />
+      </>}
+      {currentTab === 'gallery' && <GalleryView favorites={progress.favorites} discoveredIds={progress.discoveredIds} setShowBook={setShowBook} onCreatureClick={setSelectedCreature} />}
+      {currentTab === 'journal' && <>
+        <section className="bg-[#fffaf2] p-5 rounded-3xl mb-5 shadow-card border-2 border-amber-200">
+          <h2 className="text-xl font-black mb-3 flex gap-2 items-center"><Mail />叔父さんとの通信記録</h2>
+          <div className="space-y-2">{UNCLE_MESSAGES.map(m => <button key={m.milestone} disabled={count < m.milestone} onClick={() => setMessage(m)} className="block w-full text-left rounded-xl p-3 bg-white border border-amber-200 disabled:opacity-50 font-bold text-sm">{count >= m.milestone ? `${progress.readMilestones.includes(m.milestone) ? '✉' : '● 新着'} ${m.subject}` : `${m.milestone}種類の発見で届く通信`}</button>)}</div>
+          <p className="text-xs mt-4 text-stone-500">撮影成功 {progress.captures} 回 ・ 発見 {count} 種類</p>
+        </section>
+        <JournalView favorites={progress.favorites} onCreatureClick={setSelectedCreature} />
+      </>}
+    </main>
+    {!activeArea && <BottomNav currentTab={currentTab} onTabChange={tab => { setCurrentTab(tab); window.scrollTo(0, 0); }} />}
+    {showBook && <RealisticBook creatures={CREATURES} discoveredIds={progress.discoveredIds} onClose={() => setShowBook(false)} />}
+    <CreatureDetailModal creature={selectedCreature} onClose={() => setSelectedCreature(null)} isFavorite={!!selectedCreature && progress.favorites.includes(selectedCreature.id)} onToggleFavorite={id => dispatch({ type: 'favorite', id })}
+      userName={progress.userName} onSetBuddy={c => { dispatch({ type: 'buddy', id: c.id }); setNotice(`${c.name}が相棒になりました。ホームでふれあえます。`); }} buddyId={progress.buddyId} isLocked={!!selectedCreature && !progress.discoveredIds.includes(selectedCreature.id)} />
+    <InventoryModal isOpen={showInventory} onClose={() => setShowInventory(false)} inventory={inventory} onUseItem={feed} />
+    {showSettings && <SettingsModal progress={progress} onClose={() => setShowSettings(false)} onRestore={p => { dispatch({ type: 'restore', progress: p }); setSelectedCreature(null); setActiveArea(null); setCurrentTab('explore'); setScreen(p.onboarded ? 'game' : 'title'); setNotice('保存データを復元しました。'); }} />}
+    {message && <UncleMessageModal key={message.milestone} message={message} onClose={closeMessage} userName={progress.userName} />}
+    {notice && <div role="status" className="fixed bottom-24 left-4 right-4 mx-auto max-w-md z-[150] bg-slate-900 text-white p-4 rounded-2xl shadow-xl text-sm font-bold flex gap-2"><span className="flex-1">{notice}</span><button aria-label="お知らせを閉じる" onClick={() => setNotice('')}><X size={18} /></button></div>}
+  </div>;
 }
-
-export default App;

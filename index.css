@@ -55,3 +55,11 @@
 .clip-path-triangle {
     clip-path: polygon(0% 100%, 50% 0%, 100% 100%);
 }
+
+:focus-visible { outline: 3px solid #0369a1; outline-offset: 4px; }
+button { touch-action: manipulation; }
+button:disabled { cursor: not-allowed; }
+input { user-select: text; -webkit-user-select: text; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+}

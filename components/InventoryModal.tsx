@@ -1,6 +1,7 @@
 import React from 'react';
 import { Item } from '../types';
 import { X, Box } from 'lucide-react';
+import { useDialog } from './useDialog';
 
 interface InventoryModalProps {
     isOpen: boolean;
@@ -15,12 +16,14 @@ const InventoryModal: React.FC<InventoryModalProps> = ({
     inventory,
     onUseItem
 }) => {
+    const dialog = useDialog(isOpen);
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in text-left">
+        <div ref={dialog} role="dialog" aria-modal="true" aria-label="バッグ" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in text-left">
             <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 border-4 border-white relative font-maru">
                 <button
+                    aria-label="バッグを閉じる"
                     onClick={onClose}
                     className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
                 >

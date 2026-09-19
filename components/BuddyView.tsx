@@ -40,7 +40,7 @@ const BuddyView: React.FC<BuddyViewProps> = ({
                         </h3>
                         <span className="text-xs font-bold text-pop-pink bg-pop-pink/10 px-2 py-0.5 rounded-full">相棒</span>
                     </div>
-                    <p className="text-xs font-bold text-gray-500 mb-2">{buddy.perk}</p>
+                    <p className="text-xs font-bold text-gray-500 mb-2">{buddy.perk} ・ 絆 {buddy.syncRate}%</p>
                     {/* Sync Bar */}
                     <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden relative">
                         <div
@@ -52,8 +52,8 @@ const BuddyView: React.FC<BuddyViewProps> = ({
                             )}
                         </div>
                     </div>
-                    {buddy.syncRate >= 100 && buddy.evolutionLevel === 1 && (
-                        <p className="text-[10px] text-pop-yellow font-black mt-1 animate-bounce text-right">進化可能！</p>
+                    {buddy.syncRate >= 100 && true && (
+                        <p className="text-[10px] text-pop-yellow font-black mt-1 animate-bounce text-right">最高の相棒！</p>
                     )}
                 </div>
 

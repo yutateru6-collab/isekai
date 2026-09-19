@@ -16,7 +16,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onTabChange }) => {
   ];
 
   return (
-    <div className="fixed bottom-6 left-0 right-0 z-40 px-4 pointer-events-none flex justify-center">
+    <nav aria-label="メインメニュー" className="fixed left-0 right-0 z-40 px-4 pointer-events-none flex justify-center" style={{ bottom: 'max(16px, env(safe-area-inset-bottom))' }}>
       <div className="bg-white rounded-full shadow-card border-4 border-white p-2 flex gap-2 pointer-events-auto items-center">
         {items.map((item) => {
           const isActive = currentTab === item.id;
@@ -33,22 +33,24 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onTabChange }) => {
           return (
             <button
               key={item.id}
+              aria-label={item.label}
+              aria-current={isActive ? 'page' : undefined}
               onClick={() => onTabChange(item.id)}
               className={`
-                relative flex items-center justify-center gap-2 px-6 py-3 rounded-full transition-all duration-300
+                relative flex flex-col items-center justify-center gap-1 px-6 py-2 rounded-full transition-all duration-300
                 ${isActive 
-                  ? `${activeColorClass} text-white shadow-pop -translate-y-2` 
+                  ? `${activeColorClass} text-slate-900 shadow-pop -translate-y-1`
                   : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
                 }
               `}
             >
               <Icon 
-                className={`w-6 h-6 transition-transform ${isActive ? 'scale-110' : ''} ${isActive ? 'fill-current' : ''}`} 
+                className={`w-6 h-6 transition-transform ${isActive ? 'scale-110' : ''}`}
                 strokeWidth={isActive ? 3 : 2.5}
               />
               
-              {isActive && (
-                <span className="text-sm font-black tracking-wide whitespace-nowrap hidden sm:block">
+              {(
+                <span className="text-xs font-black tracking-wide whitespace-nowrap">
                   {item.label}
                 </span>
               )}
@@ -56,7 +58,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onTabChange }) => {
           );
         })}
       </div>
-    </div>
+    </nav>
   );
 };
 
