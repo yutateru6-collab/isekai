@@ -1,126 +1,27 @@
 <!DOCTYPE html>
 <html lang="ja">
-
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport"
-    content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="theme-color" content="#FFF9F0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#214d3d" />
   <meta name="format-detection" content="telephone=no" />
-  <meta name="description" content="いつもの日常のすぐ隣で、33種類の異世界生物を探す。探索・撮影・図鑑・相棒育成を楽しめるゲーム。" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="description" content="叔父さんの手がかりを頼りに、景色に隠れた痕跡を調査。33種類の異世界生物との出会いを集める、観測と相棒のブラウザゲーム。" />
+  <meta property="og:title" content="パラレル生物図鑑：異世界観測ログ" />
+  <meta property="og:description" content="いつもの景色に、小さな違和感。痕跡を読み解き、まだ名前のない生物を見つけよう。" />
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="ja_JP" />
+  <meta property="og:image" content="/og-preview.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <title>パラレル生物図鑑：異世界観測ログ</title>
   <link rel="icon" href="/image/book_icon.png" />
-  <title>パラレル生物図鑑：身近な生き物編</title>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700;900&family=DotGothic16&display=swap"
-    rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Kiwi+Maru:wght@500&display=swap" rel="stylesheet">
-  <style>
-    body {
-      background-color: #FFF9F0;
-      color: #4A4A4A;
-      background-image: radial-gradient(#FFD60A 2px, transparent 2px), radial-gradient(#4CC9F0 2px, transparent 2px);
-      background-size: 30px 30px;
-      background-position: 0 0, 15px 15px;
-      font-family: 'Zen Maru Gothic', sans-serif;
-      overflow-x: hidden;
-
-      /* Mobile Optimizations */
-      user-select: none;
-      -webkit-user-select: none;
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
-    }
-
-    /* Custom Scrollbar - Cute Version */
-    ::-webkit-scrollbar {
-      width: 12px;
-    }
-
-    ::-webkit-scrollbar-track {
-      background: #FFF9F0;
-      border-radius: 10px;
-    }
-
-    ::-webkit-scrollbar-thumb {
-      background: #FFD60A;
-      border-radius: 10px;
-      border: 3px solid #FFF9F0;
-    }
-
-    .font-maru {
-      font-family: 'Zen Maru Gothic', sans-serif;
-    }
-
-    /* アニメーション */
-    .particle {
-      position: fixed;
-      bottom: -50px;
-      background-color: rgba(255, 214, 10, 0.4);
-      border-radius: 50%;
-      pointer-events: none;
-      animation: drift 20s infinite linear;
-      z-index: -1;
-    }
-
-    .particle.blue {
-      background-color: rgba(76, 201, 240, 0.4);
-    }
-
-    .particle.pink {
-      background-color: rgba(247, 37, 133, 0.4);
-    }
-
-    @keyframes drift {
-      0% {
-        bottom: -50px;
-        transform: translateX(0) rotate(0deg);
-        opacity: 0;
-      }
-
-      10% {
-        opacity: 0.8;
-      }
-
-      90% {
-        opacity: 0.8;
-      }
-
-      100% {
-        bottom: 110vh;
-        transform: translateX(50px) rotate(360deg);
-        opacity: 0;
-      }
-    }
-
-    .glass-panel {
-      background: rgba(255, 255, 255, 0.7);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      border: 2px solid rgba(255, 255, 255, 0.8);
-    }
-  </style>
-  <link rel="stylesheet" href="/index.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700;900&family=DotGothic16&family=Kiwi+Maru:wght@500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/index.css" />
+  <style>body{margin:0;background:#f0ecdf;color:#243e35;font-family:'Zen Maru Gothic',sans-serif;overflow-x:hidden;-webkit-tap-highlight-color:transparent;touch-action:manipulation}.font-maru{font-family:'Zen Maru Gothic',sans-serif}.glass-panel{background:#ffffffb3;backdrop-filter:blur(10px);border:2px solid #ffffffcc}button,a,summary{-webkit-tap-highlight-color:transparent}</style>
 </head>
-
-<body>
-  <div id="root"></div>
-  <div class="particle" style="width: 15px; height: 15px; left: 10%; animation-duration: 15s; animation-delay: 0s;">
-  </div>
-  <div class="particle blue"
-    style="width: 25px; height: 25px; left: 20%; animation-duration: 22s; animation-delay: 5s;"></div>
-  <div class="particle pink"
-    style="width: 10px; height: 10px; left: 35%; animation-duration: 18s; animation-delay: 2s;"></div>
-  <div class="particle" style="width: 30px; height: 30px; left: 50%; animation-duration: 25s; animation-delay: 0s;">
-  </div>
-  <div class="particle blue"
-    style="width: 12px; height: 12px; left: 65%; animation-duration: 20s; animation-delay: 8s;"></div>
-  <div class="particle pink"
-    style="width: 22px; height: 22px; left: 85%; animation-duration: 23s; animation-delay: 3s;"></div>
-  <div class="particle" style="width: 18px; height: 18px; left: 95%; animation-duration: 17s; animation-delay: 10s;">
-  </div>
-  <script type="module" src="/index.tsx"></script>
-</body>
-
+<body><div id="root"></div><script type="module" src="/index.tsx"></script></body>
 </html>

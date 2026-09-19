@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CheckCircle2, ClipboardList, Lightbulb, Mail } from 'lucide-react';
-import { ITEMS } from '../constants';
+import { ArrowRight, Check, Compass, Lightbulb, Mail } from 'lucide-react';
 import { InvestigationMission } from '../data/missions';
 
 interface Props {
@@ -9,35 +8,20 @@ interface Props {
   total: number;
   postscript: InvestigationMission | null;
   onAcknowledgePostscript: (id: string) => void;
+  onDepart: () => void;
+  inventoryIds: string[];
 }
-
-export default function MissionCard({ mission, completedCount, total, postscript, onAcknowledgePostscript }: Props) {
+export default function MissionCard({ mission, completedCount, total, postscript, onAcknowledgePostscript, onDepart, inventoryIds }: Props) {
   const [showHint, setShowHint] = useState(false);
   useEffect(() => setShowHint(false), [mission?.id]);
-
-  if (postscript) return <section className="rounded-2xl bg-indigo-950 text-white p-4 mb-4 shadow-lg border border-indigo-300/40">
-    <div className="flex items-center gap-2 text-indigo-200 text-xs font-black tracking-wider"><Mail size={17} />叔父さんからの追伸</div>
-    <h2 className="font-black text-lg mt-2">{postscript.title}：調査完了</h2>
-    <p className="text-sm leading-6 mt-2 text-indigo-50">{postscript.postscript}</p>
-    <button onClick={() => onAcknowledgePostscript(postscript.id)} className="mt-3 rounded-xl bg-white text-indigo-950 px-4 py-2 text-sm font-black">読んだ</button>
-  </section>;
-
-  if (!mission) return <section className="rounded-2xl bg-emerald-950 text-white p-4 mb-4 shadow-lg border border-emerald-300/40">
-    <div className="flex items-center gap-2 text-emerald-200 text-xs font-black tracking-wider"><CheckCircle2 size={17} />叔父さんの調査依頼</div>
-    <h2 className="font-black text-lg mt-2">今ある依頼はすべて完了！</h2>
-    <p className="text-sm leading-6 mt-2">調査依頼 {completedCount} / {total} 件を達成。通常の探索と図鑑集めはそのまま続けられます。</p>
-  </section>;
-
-  const item = mission.requiredItemId ? ITEMS.find(i => i.id === mission.requiredItemId) : null;
-  return <section className="rounded-2xl bg-[#fffaf2] p-4 mb-4 shadow-sm border-2 border-amber-300">
-    <div className="flex items-center justify-between gap-3">
-      <div className="flex items-center gap-2 text-amber-800 text-xs font-black tracking-wider"><ClipboardList size={17} />叔父さんの調査依頼</div>
-      <span className="text-xs font-bold text-stone-500">{completedCount} / {total}</span>
-    </div>
-    <h2 className="font-black text-lg text-[#5d4037] mt-2">{mission.title}</h2>
-    <ul className="mt-2 space-y-1 text-sm leading-6 text-stone-700">{mission.clues.map((clue, i) => <li key={i}>・{clue}</li>)}</ul>
-    {item && !showHint && <p className="text-xs font-bold text-amber-800 mt-3">この依頼には「持ち物」の手がかりもある。</p>}
-    {!showHint ? <button onClick={() => setShowHint(true)} className="mt-3 flex items-center gap-2 text-sm font-black text-sky-800 underline underline-offset-4"><Lightbulb size={17} />行き詰まったので追加ヒントを見る</button>
-      : <div className="mt-3 bg-amber-50 rounded-xl p-3 border border-amber-200"><p className="text-xs font-black text-amber-800 mb-1">追加ヒント</p><p className="text-sm leading-6">{mission.extraHint}</p></div>}
+  return <section className={`mission-note ${postscript ? 'mission-note-letter' : ''}`} aria-label="叔父さんの調査依頼">
+    <div className="mission-note-heading"><span><Mail size={18} />{postscript ? '叔父さんからの追伸' : '叔父さんの調査依頼'}</span><span className="mission-fraction">{String(completedCount).padStart(2, '0')} / {String(total).padStart(2, '0')}</span></div>
+    {postscript ? <><h2>調査、ありがとう。</h2><p className="mission-subtitle">{postscript.title} ／ 調査完了</p><p className="mission-letter">{postscript.postscript}</p><button className="action-primary" onClick={() => onAcknowledgePostscript(postscript.id)}>追伸を読んで、次の依頼へ<ArrowRight size={18} /></button></> : mission ? <>
+      <h2>{mission.title}</h2>
+      <ol className="mission-clues">{mission.clues.map((clue, i) => <li key={clue}><span>{String(i + 1).padStart(2, '0')}</span><p>{clue}</p></li>)}</ol>
+      <button className="mission-hint-toggle" aria-expanded={showHint} aria-controls="mission-extra-hint" onClick={() => setShowHint(!showHint)}><Lightbulb size={17} />{showHint ? '追加ヒントを閉じる' : '追加ヒントを見る'}</button>
+      {showHint && <div id="mission-extra-hint" className="mission-extra-hint"><p>{mission.extraHint}</p>{mission.requiredItemId && <p>{inventoryIds.includes(mission.requiredItemId) ? '必要な持ち物はバッグに入っています。消費せずに調査できます。' : '必要な道具がないときは、どのエリアでも「金属の落とし物」の痕跡を調べて回収しよう。持ち物がそろったら、新しい調査で対象を探せます。'}</p>}</div>}
+      <button className="action-primary mission-depart" onClick={onDepart}><Compass size={21} /><span>調査に出発<small>場所と時間を、自分で選ぶ</small></span><ArrowRight size={21} /></button>
+    </> : <><h2><Check size={24} />すべての依頼を観測完了</h2><p className="mission-letter">{total}件の手がかりを解き明かしました。まだ見ぬ生物や新しい生態を、相棒と探しにいこう。</p><button className="action-primary mission-depart" onClick={onDepart}><Compass size={21} />自由に調査に出発<ArrowRight size={21} /></button></>}
   </section>;
 }
