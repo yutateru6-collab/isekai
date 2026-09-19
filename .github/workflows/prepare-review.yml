@@ -1,0 +1,33 @@
+name: Prepare review workspace
+on:
+  push:
+    branches: [feat/field-observation-polish]
+    paths: [.github/workflows/prepare-review.yml]
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test && npm run build
+      - name: Package source and build without Git credentials
+        run: |
+          mkdir review
+          git ls-files -z | tar --null -T - -czf review/source.tgz
+          tar czf review/dependencies.tgz node_modules
+          find dist -type f -size +24M -printf '%s %p\n' | tee review/large-assets.txt
+          tar czf review/build.tgz dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: review-workspace
+          path: review/
+          retention-days: 3
